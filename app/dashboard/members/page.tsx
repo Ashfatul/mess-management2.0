@@ -72,7 +72,6 @@ export default function MembersPage() {
         throw new Error("Only Super Admins can invite new members.");
       }
 
-      // Check if email is already a member
       const { data: existingProfile } = await supabase
         .from("profiles")
         .select("*")
@@ -83,7 +82,6 @@ export default function MembersPage() {
         throw new Error("A user with this email is already registered.");
       }
 
-      // Check if there is already an active pending invite for this email
       const { data: existingInvite } = await supabase
         .from("invites")
         .select("*")
@@ -95,7 +93,6 @@ export default function MembersPage() {
         throw new Error("A pending invite already exists for this email.");
       }
 
-      // Create invite
       const { error } = await supabase.from("invites").insert({
         email: inviteEmail.trim().toLowerCase(),
         role: inviteRole,
@@ -130,9 +127,9 @@ export default function MembersPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex justify-center items-center bg-zinc-950 text-zinc-50 py-12">
-        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-zinc-400 text-sm">Loading Members directory...</p>
+      <div className="flex-1 flex flex-col justify-center items-center bg-zinc-950 text-zinc-50 py-24 gap-4">
+        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-zinc-300 text-sm font-medium">Loading Members directory...</p>
       </div>
     );
   }
@@ -140,20 +137,20 @@ export default function MembersPage() {
   const isSuperAdmin = profile?.role === "super_admin";
 
   return (
-    <div className="flex-1 p-6 md:p-8 space-y-8 bg-zinc-950 text-zinc-50 font-sans">
+    <div className="flex-1 p-6 md:p-8 space-y-8 bg-zinc-950 text-zinc-50 font-sans text-sm md:text-base">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Members & Role Management</h1>
-          <p className="text-xs text-zinc-400">View mess members and invite new people to join</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Members & Role Management</h1>
+          <p className="text-sm text-zinc-400">View mess members and invite new people to join</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Left Column: Invite Member Form (Super Admin only) */}
+        {/* Left Column: Invite Member Form */}
         <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-6 space-y-6 backdrop-blur">
           <div>
-            <h2 className="text-sm font-semibold text-zinc-200">Invite Member</h2>
-            <p className="text-[11px] text-zinc-500">
+            <h2 className="text-base font-semibold text-zinc-200 font-sans">Invite Member</h2>
+            <p className="text-xs text-zinc-500">
               {isSuperAdmin
                 ? "Send an invite to a member email address"
                 : "Only Super Admins can send invitations"}
@@ -162,25 +159,25 @@ export default function MembersPage() {
 
           <form onSubmit={handleSendInvite} className="space-y-4">
             <div>
-              <label className="block text-xs text-zinc-400 mb-1.5 font-medium">Email Address</label>
+              <label className="block text-sm font-medium text-zinc-400 mb-1.5">Email Address</label>
               <input
                 type="email"
                 required
                 disabled={!isSuperAdmin}
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2 rounded-lg text-zinc-200 placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm disabled:opacity-50"
+                className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-200 placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm disabled:opacity-50"
                 placeholder="name@example.com"
               />
             </div>
 
             <div>
-              <label className="block text-xs text-zinc-400 mb-1.5 font-medium">Role</label>
+              <label className="block text-sm font-medium text-zinc-400 mb-1.5">Role</label>
               <select
                 value={inviteRole}
                 onChange={(e) => setInviteRole(e.target.value)}
                 disabled={!isSuperAdmin}
-                className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm disabled:opacity-50"
+                className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm pr-10 appearance-none cursor-pointer"
               >
                 <option value="member">Member</option>
                 <option value="super_admin">Super Admin</option>
@@ -196,7 +193,7 @@ export default function MembersPage() {
             <button
               type="submit"
               disabled={submitting || !isSuperAdmin}
-              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg text-sm shadow-md transition-colors disabled:opacity-50"
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg text-sm shadow-md transition-colors disabled:opacity-50"
             >
               {submitting ? "Inviting..." : "Invite Member"}
             </button>
@@ -208,11 +205,11 @@ export default function MembersPage() {
           {/* Active Members Table */}
           <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden backdrop-blur">
             <div className="px-6 py-4 border-b border-zinc-800 bg-zinc-900/55">
-              <h2 className="font-semibold text-sm text-zinc-200 font-sans">Active Members</h2>
+              <h2 className="font-semibold text-sm md:text-base text-zinc-200 font-sans">Active Members</h2>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-zinc-300">
-                <thead className="bg-zinc-950/80 text-[10px] text-zinc-400 border-b border-zinc-800 uppercase tracking-wider">
+              <table className="w-full text-left text-sm text-zinc-300">
+                <thead className="bg-zinc-950/80 text-xs text-zinc-400 border-b border-zinc-800 uppercase tracking-wider">
                   <tr>
                     <th className="px-6 py-3.5">Name</th>
                     <th className="px-6 py-3.5">Email</th>
@@ -221,11 +218,11 @@ export default function MembersPage() {
                 </thead>
                 <tbody className="divide-y divide-zinc-800/40">
                   {members.map((m) => (
-                    <tr key={m.id} className="hover:bg-zinc-900/10 transition-colors">
-                      <td className="px-6 py-4 font-semibold text-white">{m.full_name || "Unnamed"}</td>
-                      <td className="px-6 py-4 text-zinc-400">{m.email}</td>
+                    <tr key={m.id} className="hover:bg-zinc-900/10 transition-colors text-sm md:text-base">
+                      <td className="px-6 py-4 font-bold text-white">{m.full_name || "Unnamed"}</td>
+                      <td className="px-6 py-4 text-zinc-400 font-medium">{m.email}</td>
                       <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                           m.role === "super_admin"
                             ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
                             : "bg-zinc-800 text-zinc-300"
@@ -243,11 +240,11 @@ export default function MembersPage() {
           {/* Pending Invites Table */}
           <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden backdrop-blur">
             <div className="px-6 py-4 border-b border-zinc-800 bg-zinc-900/55">
-              <h2 className="font-semibold text-sm text-zinc-200 font-sans">Pending Invitations</h2>
+              <h2 className="font-semibold text-sm md:text-base text-zinc-200 font-sans">Pending Invitations</h2>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-zinc-300">
-                <thead className="bg-zinc-950/80 text-[10px] text-zinc-400 border-b border-zinc-800 uppercase tracking-wider">
+              <table className="w-full text-left text-sm text-zinc-300">
+                <thead className="bg-zinc-950/80 text-xs text-zinc-400 border-b border-zinc-800 uppercase tracking-wider">
                   <tr>
                     <th className="px-6 py-3.5">Email</th>
                     <th className="px-6 py-3.5">Role</th>
@@ -258,7 +255,7 @@ export default function MembersPage() {
                 <tbody className="divide-y divide-zinc-800/40">
                   {invites.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="text-center py-6 text-zinc-500">
+                      <td colSpan={4} className="text-center py-8 text-zinc-500 text-sm">
                         No pending invites.
                       </td>
                     </tr>
@@ -266,10 +263,10 @@ export default function MembersPage() {
                     invites.map((inv) => {
                       const signupLink = `${baseUrl}/signup?token=${inv.token}`;
                       return (
-                        <tr key={inv.id} className="hover:bg-zinc-900/10 transition-colors">
-                          <td className="px-6 py-4 font-medium text-white">{inv.email}</td>
+                        <tr key={inv.id} className="hover:bg-zinc-900/10 transition-colors text-sm">
+                          <td className="px-6 py-4 font-bold text-white">{inv.email}</td>
                           <td className="px-6 py-4">
-                            <span className="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[10px]">
+                            <span className="px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-xs font-semibold">
                               {inv.role}
                             </span>
                           </td>
@@ -279,14 +276,14 @@ export default function MembersPage() {
                                 type="text"
                                 readOnly
                                 value={signupLink}
-                                className="bg-zinc-950 text-[10px] border border-zinc-800 px-2 py-1 rounded w-48 text-zinc-400"
+                                className="bg-zinc-950 text-xs border border-zinc-800 px-3 py-1.5 rounded w-52 text-zinc-400"
                               />
                               <button
                                 onClick={() => {
                                   navigator.clipboard.writeText(signupLink);
                                   alert("Signup link copied to clipboard!");
                                 }}
-                                className="text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-1 px-2.5 rounded transition-colors"
+                                className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-1.5 px-3 rounded transition-colors"
                               >
                                 Copy
                               </button>

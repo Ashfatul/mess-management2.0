@@ -92,9 +92,9 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col justify-center items-center bg-zinc-950 text-zinc-50 py-12">
-        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-zinc-400 text-sm">Calculating sheet formulas...</p>
+      <div className="flex-1 flex flex-col justify-center items-center bg-zinc-950 text-zinc-50 py-24 gap-4">
+        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-zinc-300 text-sm font-medium">Calculating sheet formulas...</p>
       </div>
     );
   }
@@ -109,11 +109,10 @@ export default function DashboardPage() {
     .reduce((sum, c) => sum + Number(c.amount || 0), 0);
   const mealRate = totalMeals > 0 ? totalMealCost / totalMeals : 0;
 
-  // Other Cost Calculations
+  // Total Other Cost Calculations
   const totalOtherCost = costs
     .filter((c) => c.cost_category !== "meal_bazar")
     .reduce((sum, c) => sum + Number(c.amount || 0), 0);
-  const otherCostSharePerPerson = totalOtherCost / memberCount;
 
   // Deposits & Balance Calculations
   const totalDeposits = deposits.reduce((sum, d) => sum + Number(d.amount || 0), 0);
@@ -129,8 +128,19 @@ export default function DashboardPage() {
     // 2. Individual meal cost share
     const mMealCostShare = mMeals * mealRate;
 
-    // 3. Individual other cost share (divided equally)
-    const mOtherCostShare = otherCostSharePerPerson;
+    // 3. Individual other cost share (dividing custom split or equally)
+    let mOtherCostShare = 0;
+    costs
+      .filter((c) => c.cost_category !== "meal_bazar")
+      .forEach((c) => {
+        if (c.shared_by && c.shared_by.length > 0) {
+          if (c.shared_by.includes(m.id)) {
+            mOtherCostShare += Number(c.amount) / c.shared_by.length;
+          }
+        } else {
+          mOtherCostShare += Number(c.amount) / memberCount;
+        }
+      });
 
     // 4. Individual total cost share
     const mTotalCostShare = mMealCostShare + mOtherCostShare;
@@ -162,12 +172,12 @@ export default function DashboardPage() {
   });
 
   return (
-    <div className="flex-1 p-6 md:p-8 space-y-8 bg-zinc-950 text-zinc-50 relative">
+    <div className="flex-1 p-6 md:p-8 space-y-8 bg-zinc-950 text-zinc-50 relative text-sm md:text-base">
       {/* Upper Action Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Summary & Status</h1>
-          <p className="text-xs text-zinc-400">Manage and view the mess calculations at a glance</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">Summary & Status</h1>
+          <p className="text-xs md:text-sm text-zinc-400">Manage and view the mess calculations at a glance</p>
         </div>
 
         {/* Month / Year Selector */}
@@ -175,7 +185,7 @@ export default function DashboardPage() {
           <select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(Number(e.target.value))}
-            className="bg-transparent text-sm border-0 focus:ring-0 text-zinc-200 py-1.5 px-3 rounded-lg hover:bg-zinc-800 cursor-pointer"
+            className="bg-transparent text-sm border-0 focus:ring-0 text-zinc-200 py-1.5 px-3 rounded-lg hover:bg-zinc-800 cursor-pointer pr-8 appearance-none"
           >
             {months.map((m) => (
               <option key={m.value} value={m.value} className="bg-zinc-900 text-zinc-200">
@@ -187,7 +197,7 @@ export default function DashboardPage() {
           <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="bg-transparent text-sm border-0 focus:ring-0 text-zinc-200 py-1.5 px-3 rounded-lg hover:bg-zinc-800 cursor-pointer"
+            className="bg-transparent text-sm border-0 focus:ring-0 text-zinc-200 py-1.5 px-3 rounded-lg hover:bg-zinc-800 cursor-pointer pr-8 appearance-none"
           >
             {years.map((y) => (
               <option key={y} value={y} className="bg-zinc-900 text-zinc-200">
@@ -201,47 +211,44 @@ export default function DashboardPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl backdrop-blur flex flex-col justify-between">
-          <span className="text-xs text-zinc-400 font-medium">Total Deposit</span>
-          <h3 className="text-xl md:text-2xl font-bold text-white mt-2">
-            {totalDeposits.toLocaleString()} <span className="text-xs font-normal text-zinc-500">TK</span>
+          <span className="text-xs md:text-sm text-zinc-400 font-medium">Total Deposit</span>
+          <h3 className="text-xl md:text-3xl font-bold text-white mt-2">
+            {totalDeposits.toLocaleString()} <span className="text-xs md:text-sm font-normal text-zinc-500">TK</span>
           </h3>
         </div>
 
         <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl backdrop-blur flex flex-col justify-between">
-          <span className="text-xs text-zinc-400 font-medium">Total Meal Cost</span>
-          <h3 className="text-xl md:text-2xl font-bold text-white mt-2">
-            {totalMealCost.toLocaleString()} <span className="text-xs font-normal text-zinc-500">TK</span>
+          <span className="text-xs md:text-sm text-zinc-400 font-medium">Total Meal Cost</span>
+          <h3 className="text-xl md:text-3xl font-bold text-white mt-2">
+            {totalMealCost.toLocaleString()} <span className="text-xs md:text-sm font-normal text-zinc-500">TK</span>
           </h3>
         </div>
 
         <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl backdrop-blur flex flex-col justify-between">
-          <span className="text-xs text-zinc-400 font-medium">Total Other Cost</span>
-          <h3 className="text-xl md:text-2xl font-bold text-white mt-2">
-            {totalOtherCost.toLocaleString()} <span className="text-xs font-normal text-zinc-500">TK</span>
+          <span className="text-xs md:text-sm text-zinc-400 font-medium">Total Other Cost</span>
+          <h3 className="text-xl md:text-3xl font-bold text-white mt-2">
+            {totalOtherCost.toLocaleString()} <span className="text-xs md:text-sm font-normal text-zinc-500">TK</span>
           </h3>
         </div>
 
         <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl backdrop-blur flex flex-col justify-between">
-          <span className="text-xs text-zinc-400 font-medium">Current Balance</span>
-          <h3 className={`text-xl md:text-2xl font-bold mt-2 ${currentBalance >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-            {currentBalance.toLocaleString()} <span className="text-xs font-normal text-zinc-500">TK</span>
+          <span className="text-xs md:text-sm text-zinc-400 font-medium">Current Balance</span>
+          <h3 className={`text-xl md:text-3xl font-bold mt-2 ${currentBalance >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+            {currentBalance.toLocaleString()} <span className="text-xs md:text-sm font-normal text-zinc-500">TK</span>
           </h3>
         </div>
       </div>
 
       {/* Calculations Details Card */}
       <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden backdrop-blur">
-        <div className="px-6 py-4 border-b border-zinc-800 bg-zinc-900/55 flex justify-between items-center">
-          <h2 className="font-semibold text-sm text-zinc-200">Calculation Constants</h2>
-          <div className="flex gap-4 text-xs text-zinc-400">
+        <div className="px-6 py-4 border-b border-zinc-800 bg-zinc-900/55 flex flex-col sm:flex-row gap-2 justify-between sm:items-center">
+          <h2 className="font-semibold text-sm md:text-base text-zinc-200">Calculation Constants</h2>
+          <div className="flex gap-4 text-xs md:text-sm text-zinc-400">
             <div>
               Total Meals: <span className="text-white font-medium">{totalMeals}</span>
             </div>
             <div>
               Meal Rate: <span className="text-indigo-400 font-semibold">{mealRate.toFixed(2)} TK</span>
-            </div>
-            <div>
-              Utilities Per Head: <span className="text-indigo-400 font-semibold">{otherCostSharePerPerson.toFixed(2)} TK</span>
             </div>
           </div>
         </div>
@@ -261,19 +268,19 @@ export default function DashboardPage() {
             </thead>
             <tbody className="divide-y divide-zinc-800/60">
               {summaryRows.map((row) => (
-                <tr key={row.profile.id} className="hover:bg-zinc-900/20 transition-colors">
-                  <td className="px-6 py-4 font-medium text-white">{row.profile.full_name || "Unnamed"}</td>
-                  <td className="px-6 py-4">{row.meals}</td>
+                <tr key={row.profile.id} className="hover:bg-zinc-900/20 transition-colors text-sm md:text-base">
+                  <td className="px-6 py-4 font-bold text-white">{row.profile.full_name || "Unnamed"}</td>
+                  <td className="px-6 py-4 font-semibold text-zinc-300">{row.meals}</td>
                   <td className="px-6 py-4">{row.mealCostShare.toFixed(2)} TK</td>
                   <td className="px-6 py-4">{row.otherCostShare.toFixed(2)} TK</td>
                   <td className="px-6 py-4">{row.directSpending.toFixed(2)} TK</td>
-                  <td className={`px-6 py-4 font-semibold ${row.balance >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                  <td className={`px-6 py-4 font-bold ${row.balance >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                     {row.balance >= 0 ? "+" : ""}
                     {row.balance.toFixed(2)} TK
                   </td>
                   <td className="px-6 py-4">
                     <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
                         row.status === "You will get paid"
                           ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                           : row.status === "You have to pay"
@@ -292,10 +299,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Helpful Instructions */}
-      <div className="p-4 rounded-xl bg-zinc-900/20 border border-zinc-800 text-xs text-zinc-500 space-y-1">
+      <div className="p-5 rounded-xl bg-zinc-900/20 border border-zinc-800 text-xs md:text-sm text-zinc-500 space-y-1.5">
         <p className="font-semibold text-zinc-400">💡 Calculation Notes:</p>
         <p>• Meal Rate = Total Meal Cost / Total Meal Count.</p>
-        <p>• Utilities Share = Total other costing (Wifi, Gas, Electricity, Global Bazar, other costs) divided equally among members.</p>
+        <p>• Utilities Share = Calculated per transaction. Divided equally only among the members selected for that cost (custom splits), otherwise divided equally among all members.</p>
         <p>• Your Spending represents all items you purchased directly on behalf of the mess using your own money.</p>
         <p>• Net Balance = Your Spending - Meal Cost Share - Utilities Share. Positive balance means you will get paid back; negative means you have to pay the manager.</p>
       </div>

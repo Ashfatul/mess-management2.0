@@ -88,6 +88,7 @@ CREATE TABLE costs (
     cost_category TEXT CHECK (cost_category IN ('meal_bazar', 'global_bazar', 'wifi', 'gas', 'electricity', 'other')) NOT NULL,
     items TEXT, -- description of items bought
     amount NUMERIC(10, 2) NOT NULL CHECK (amount >= 0.0),
+    shared_by UUID[], -- array of profile IDs sharing this cost (NULL means shared by all)
     added_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -104,6 +105,9 @@ CREATE POLICY "Allow read mess details for members" ON messes
     FOR SELECT TO authenticated USING (
         id = get_my_mess_id()
     );
+
+CREATE POLICY "Allow authenticated users to create a mess" ON messes
+    FOR INSERT TO authenticated WITH CHECK (true);
 
 CREATE POLICY "Allow update mess details for super admin" ON messes
     FOR UPDATE TO authenticated USING (
