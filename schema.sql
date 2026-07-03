@@ -14,6 +14,7 @@ DROP TABLE IF EXISTS messes CASCADE;
 CREATE TABLE messes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
+    meal_entry_rule TEXT CHECK (meal_entry_rule IN ('anyone', 'admin_only', 'member_self_only')) NOT NULL DEFAULT 'anyone',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

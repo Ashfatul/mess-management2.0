@@ -35,11 +35,17 @@ function SignupForm() {
           const data = res.data;
           const error = res.error;
           if (data && !error) {
-            setEmail(data.email);
-            setIsInvited(true);
-            setInviteData(data);
+            const created = new Date(data.created_at);
+            const ageInDays = (new Date().getTime() - created.getTime()) / (1000 * 3600 * 24);
+            if (ageInDays > 30) {
+              setErrorMsg("This invitation has expired (valid for 30 days). Registering as regular user.");
+            } else {
+              setEmail(data.email);
+              setIsInvited(true);
+              setInviteData(data);
+            }
           } else {
-            setErrorMsg("Invalid or expired invite token. Registering as regular user.");
+            setErrorMsg("Invalid invite token. Registering as regular user.");
           }
           setCheckingToken(false);
         });

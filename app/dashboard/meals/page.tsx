@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 
 export default function MealsPage() {
   const [profile, setProfile] = useState<any>(null);
+  const [mess, setMess] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -52,6 +53,15 @@ export default function MealsPage() {
 
       if (!profileData || !profileData.mess_id) return;
       setProfile(profileData);
+
+      // Fetch mess details
+      const { data: messData } = await supabase
+        .from("messes")
+        .select("*")
+        .eq("id", profileData.mess_id)
+        .single();
+      
+      if (messData) setMess(messData);
 
       // Fetch mess members
       const { data: membersData } = await supabase
@@ -111,7 +121,7 @@ export default function MealsPage() {
       if (!session) return;
 
       // Prepare bulk upserts
-      const upsertData = members.map((member) => ({
+      const upsertData = membersToLog.map((member: any) => ({
         profile_id: member.id,
         date: selectedDate,
         count: dailyCounts[member.id] || 0,
@@ -155,6 +165,15 @@ export default function MealsPage() {
     );
   }
 
+  const isAllowedToLog = !mess || 
+    mess.meal_entry_rule !== "admin_only" || 
+    profile?.role === "super_admin";
+
+  // Filter members displayed in logger form depending on the active rule
+  const membersToLog = (mess?.meal_entry_rule === "member_self_only" && profile?.role !== "super_admin")
+    ? members.filter((m: any) => m.id === profile?.id)
+    : members;
+
   const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
   const dayRows = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
@@ -168,76 +187,94 @@ export default function MealsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Left Column: Quick Daily Logger */}
+        {/* Left Column: Quick Daily Logger (Conditional on Permissions) */}
         <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-6 space-y-6 backdrop-blur">
-          <div>
-            <h2 className="text-base font-semibold text-zinc-200">Log Daily Meals</h2>
-            <p className="text-xs text-zinc-500">Record meal counts for all members on a specific day</p>
-          </div>
+          {isAllowedToLog ? (
+            <>
+              <div>
+                <h2 className="text-base font-semibold text-zinc-200 font-sans">Log Daily Meals</h2>
+                <p className="text-xs text-zinc-500 font-sans">
+                  {mess?.meal_entry_rule === "member_self_only" && profile?.role !== "super_admin"
+                    ? "Log meals for yourself on a specific day"
+                    : "Record meal counts for all members on a specific day"}
+                </p>
+              </div>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-zinc-400 mb-1.5 font-medium">Select Date</label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm"
-              />
-            </div>
-
-            <div className="border-t border-zinc-800/80 pt-4 space-y-3.5">
-              {members.map((member) => (
-                <div key={member.id} className="flex items-center justify-between">
-                  <span className="text-sm text-zinc-200 font-bold">{member.full_name || "Unnamed"}</span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => handleCountChange(member.id, Math.max(0, (dailyCounts[member.id] || 0) - 0.5))}
-                      className="w-9 h-9 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 flex items-center justify-center text-zinc-300 hover:text-white transition-colors text-lg font-bold"
-                    >
-                      -
-                    </button>
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="0"
-                      value={dailyCounts[member.id] || 0}
-                      onChange={(e) => handleCountChange(member.id, Number(e.target.value))}
-                      className="w-14 text-center bg-zinc-950/80 border border-zinc-800 py-1.5 px-1 rounded-md text-sm font-bold text-white focus:outline-none focus:border-indigo-500"
-                    />
-                    <button
-                      onClick={() => handleCountChange(member.id, (dailyCounts[member.id] || 0) + 0.5)}
-                      className="w-9 h-9 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 flex items-center justify-center text-zinc-300 hover:text-white transition-colors text-lg font-bold"
-                    >
-                      +
-                    </button>
-                  </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-400 mb-1.5 font-medium font-sans">Select Date</label>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-sans"
+                  />
                 </div>
-              ))}
+
+                <div className="border-t border-zinc-800/80 pt-4 space-y-3.5">
+                  {membersToLog.map((member) => (
+                    <div key={member.id} className="flex items-center justify-between">
+                      <span className="text-sm text-zinc-200 font-bold font-sans">{member.full_name || "Unnamed"}</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleCountChange(member.id, Math.max(0, (dailyCounts[member.id] || 0) - 0.5))}
+                          className="w-9 h-9 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 flex items-center justify-center text-zinc-300 hover:text-white transition-colors text-lg font-bold font-sans"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          value={dailyCounts[member.id] || 0}
+                          onChange={(e) => handleCountChange(member.id, Number(e.target.value))}
+                          className="w-14 text-center bg-zinc-950/80 border border-zinc-800 py-1.5 px-1 rounded-md text-sm font-bold text-white focus:outline-none focus:border-indigo-500 font-sans"
+                        />
+                        <button
+                          onClick={() => handleCountChange(member.id, (dailyCounts[member.id] || 0) + 0.5)}
+                          className="w-9 h-9 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 flex items-center justify-center text-zinc-300 hover:text-white transition-colors text-lg font-bold font-sans"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {statusMsg && (
+                  <p className={`text-xs font-sans ${statusMsg.startsWith("Error") ? "text-red-400" : "text-emerald-400"}`}>
+                    {statusMsg}
+                  </p>
+                )}
+
+                <button
+                  onClick={handleSaveDailyMeals}
+                  disabled={saving}
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg text-sm shadow-md transition-colors disabled:opacity-50 font-sans"
+                >
+                  {saving ? "Saving..." : `Save Meals for ${selectedDate}`}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center text-center py-10 space-y-4">
+              <span className="text-3xl">🔒</span>
+              <div>
+                <h3 className="font-semibold text-zinc-200 font-sans">Meal Log Restricted</h3>
+                <p className="text-xs text-zinc-500 mt-1 font-sans">
+                  The mess manager has configured permissions so that only Super Admins are allowed to enter daily meal logs.
+                </p>
+              </div>
             </div>
-
-            {statusMsg && (
-              <p className={`text-xs ${statusMsg.startsWith("Error") ? "text-red-400" : "text-emerald-400"}`}>
-                {statusMsg}
-              </p>
-            )}
-
-            <button
-              onClick={handleSaveDailyMeals}
-              disabled={saving}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg text-sm shadow-md transition-colors disabled:opacity-50"
-            >
-              {saving ? "Saving..." : `Save Meals for ${selectedDate}`}
-            </button>
-          </div>
+          )}
         </div>
 
         {/* Right Column: Monthly Grid */}
         <div className="lg:col-span-2 bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden backdrop-blur flex flex-col h-[560px]">
           <div className="px-6 py-4 border-b border-zinc-800 bg-zinc-900/55 flex justify-between items-center shrink-0">
             <div>
-              <h2 className="font-semibold text-sm md:text-base text-zinc-200">Monthly Ledger Overview</h2>
-              <p className="text-xs text-zinc-500">Overview of active meals per day</p>
+              <h2 className="font-semibold text-sm md:text-base text-zinc-200 font-sans">Monthly Ledger Overview</h2>
+              <p className="text-xs text-zinc-500 font-sans">Overview of active meals per day</p>
             </div>
 
             {/* Month selector */}
