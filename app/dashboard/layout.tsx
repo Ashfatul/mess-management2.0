@@ -176,8 +176,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Theme Toggle Widget */}
-        <div className="p-4 border-t border-zinc-800/80 bg-zinc-950/20 flex items-center justify-between shrink-0">
+        {/* Theme Toggle Widget (Hidden for now) */}
+        {/* <div className="p-4 border-t border-zinc-800/80 bg-zinc-950/20 flex items-center justify-between shrink-0">
           <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider font-sans">Theme Mode</span>
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -185,7 +185,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           >
             {theme === "dark" ? "🌙 Dark" : "☀️ Light"}
           </button>
-        </div>
+        </div> */}
 
         {/* User profile footer */}
         <div className="p-4 border-t border-zinc-800 bg-zinc-950/40 flex items-center justify-between shrink-0">
