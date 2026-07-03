@@ -16,6 +16,7 @@ CREATE TABLE messes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     meal_entry_rule TEXT CHECK (meal_entry_rule IN ('anyone', 'admin_only', 'member_self_only')) NOT NULL DEFAULT 'anyone',
+    deposit_mode TEXT CHECK (deposit_mode IN ('prepaid', 'pay_as_you_go')) NOT NULL DEFAULT 'prepaid',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

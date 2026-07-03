@@ -112,7 +112,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     { name: "Summary", href: "/dashboard", icon: "📊" },
     { name: "Meal Log", href: "/dashboard/meals", icon: "🍽️" },
     { name: "Bazar & Costs", href: "/dashboard/costs", icon: "🛒" },
-    { name: "Deposits", href: "/dashboard/deposits", icon: "💵" },
+    ...(mess?.deposit_mode !== "pay_as_you_go"
+      ? [{ name: "Deposits", href: "/dashboard/deposits", icon: "💵" }]
+      : []),
     { name: "Members", href: "/dashboard/members", icon: "👥" },
     { name: "Settings", href: "/dashboard/settings", icon: "⚙️" },
   ];

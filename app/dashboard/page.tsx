@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 
 export default function DashboardPage() {
   const [profile, setProfile] = useState<any>(null);
+  const [mess, setMess] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1); // 1-12
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -46,6 +47,14 @@ export default function DashboardPage() {
 
       if (!profileData || !profileData.mess_id) return;
       setProfile(profileData);
+
+      // Fetch mess details
+      const { data: messData } = await supabase
+        .from("messes")
+        .select("*")
+        .eq("id", profileData.mess_id)
+        .single();
+      if (messData) setMess(messData);
 
       const { data: membersData } = await supabase
         .from("profiles")
@@ -97,6 +106,7 @@ export default function DashboardPage() {
 
   // --- Calculations ---
   const memberCount = members.length || 1;
+  const isPayAsYouGo = mess?.deposit_mode === "pay_as_you_go";
 
   // Meal Rate Calculations
   const totalMeals = meals.reduce((sum, m) => sum + Number(m.count || 0), 0);
@@ -111,8 +121,9 @@ export default function DashboardPage() {
     .reduce((sum, c) => sum + Number(c.amount || 0), 0);
 
   // Deposits & Balance Calculations
-  const totalDeposits = deposits.reduce((sum, d) => sum + Number(d.amount || 0), 0);
-  const currentBalance = totalDeposits - totalMealCost - totalOtherCost;
+  const loggedDepositsSum = deposits.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+  const totalDeposits = isPayAsYouGo ? totalMealCost + totalOtherCost : loggedDepositsSum;
+  const currentBalance = isPayAsYouGo ? 0.0 : totalDeposits - totalMealCost - totalOtherCost;
 
   // Map individual details for the members table
   const summaryRows = members.map((m) => {
@@ -147,7 +158,15 @@ export default function DashboardPage() {
       .filter((c) => c.profile_id === m.id)
       .reduce((sum, c) => sum + Number(c.amount || 0), 0);
 
-    const mBalance = mDirectSpending - mTotalCostShare;
+    // If pay_as_you_go: deposit counts as direct spending
+    const mDeposited = isPayAsYouGo 
+      ? mDirectSpending 
+      : deposits.filter((d) => d.profile_id === m.id).reduce((sum, d) => sum + Number(d.amount || 0), 0);
+
+    // Net Balance calculation
+    const mBalance = isPayAsYouGo
+      ? mDirectSpending - mTotalCostShare
+      : (mDeposited + mDirectSpending) - mTotalCostShare;
 
     let status = "Settlement";
     if (mBalance < -0.01) {
@@ -155,10 +174,6 @@ export default function DashboardPage() {
     } else if (mBalance > 0.01) {
       status = "You will get paid";
     }
-
-    const mDeposited = deposits
-      .filter((d) => d.profile_id === m.id)
-      .reduce((sum, d) => sum + Number(d.amount || 0), 0);
 
     return {
       profile: m,
@@ -173,7 +188,7 @@ export default function DashboardPage() {
   });
 
   // Determine current card details based on selected viewContext
-  let cardTitleDeposit = "Total Deposit";
+  let cardTitleDeposit = isPayAsYouGo ? "Total Spending (As Deposit)" : "Total Deposit";
   let cardTitleMealCost = "Total Meal Cost";
   let cardTitleOtherCost = "Total Other Cost";
   let cardTitleBalance = "Current Balance";
@@ -189,7 +204,7 @@ export default function DashboardPage() {
   if (viewContext !== "overall" && currentViewMember) {
     const memberSummary = summaryRows.find((row) => row.profile.id === viewContext);
     if (memberSummary) {
-      cardTitleDeposit = `${currentViewMember.full_name}'s Deposits`;
+      cardTitleDeposit = isPayAsYouGo ? `${currentViewMember.full_name}'s Spending` : `${currentViewMember.full_name}'s Deposits`;
       cardTitleMealCost = `${currentViewMember.full_name}'s Meal Share`;
       cardTitleOtherCost = `${currentViewMember.full_name}'s Other Share`;
       cardTitleBalance = `${currentViewMember.full_name}'s Net Balance`;
@@ -206,6 +221,25 @@ export default function DashboardPage() {
   const selectOptions = isSuperAdmin 
     ? members 
     : members.filter((m) => m.id === profile?.id);
+
+  // --- Calendar Math ---
+  const firstDayIndex = new Date(selectedYear, selectedMonth - 1, 1).getDay(); // Starting weekday (0 = Sun, 1 = Mon...)
+  const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+  const calendarCells = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  const getCalendarDayMeta = (dayNum: number) => {
+    const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+    const dayMeals = meals.filter((meal) => meal.date === dateStr);
+    const dayMealsSum = dayMeals.reduce((sum, meal) => sum + Number(meal.count || 0), 0);
+    const hasHistory = dayMeals.length > 0 && dayMealsSum > 0;
+
+    const cellDate = new Date(selectedYear, selectedMonth - 1, dayNum);
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+    const isFuture = cellDate > todayDate;
+
+    return { hasHistory, isFuture, dayMealsSum };
+  };
 
   return (
     <div className="flex-1 bg-zinc-950 text-zinc-50 relative text-sm md:text-base flex flex-col h-full overflow-hidden">
@@ -301,11 +335,11 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Calculations Details Card */}
+        {/* Calculations details card (Full Width) */}
         <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden backdrop-blur">
           <div className="px-6 py-4 border-b border-zinc-800 bg-zinc-900/55 flex flex-col sm:flex-row gap-2 justify-between sm:items-center">
             <h2 className="font-semibold text-sm md:text-base text-zinc-200">Calculation Constants</h2>
-            <div className="flex gap-4 text-xs md:text-sm text-zinc-400">
+            <div className="flex gap-4 text-xs md:text-sm text-zinc-400 font-sans">
               <div>
                 Total Meals: <span className="text-white font-medium">{totalMeals}</span>
               </div>
@@ -321,6 +355,7 @@ export default function DashboardPage() {
                 <tr>
                   <th className="px-6 py-3.5">Name</th>
                   <th className="px-6 py-3.5">Meal Count</th>
+                  <th className="px-6 py-3.5 font-sans">{isPayAsYouGo ? "Contribution" : "Deposited"}</th>
                   <th className="px-6 py-3.5">Meal Cost Share</th>
                   <th className="px-6 py-3.5">Utilities Share</th>
                   <th className="px-6 py-3.5">Your Spending</th>
@@ -343,6 +378,7 @@ export default function DashboardPage() {
                         {row.profile.id === profile?.id && <span className="text-xs text-indigo-400 font-normal ml-1.5 font-sans">(You)</span>}
                       </td>
                       <td className="px-6 py-4 font-semibold text-zinc-300">{row.meals}</td>
+                      <td className="px-6 py-4 font-semibold text-indigo-400">{row.deposited.toFixed(2)} TK</td>
                       <td className="px-6 py-4">{row.mealCostShare.toFixed(2)} TK</td>
                       <td className="px-6 py-4">{row.otherCostShare.toFixed(2)} TK</td>
                       <td className="px-6 py-4">{row.directSpending.toFixed(2)} TK</td>
@@ -371,13 +407,107 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Helpful Instructions */}
-        <div className="p-5 rounded-xl bg-zinc-900/20 border border-zinc-800 text-xs md:text-sm text-zinc-500 space-y-1.5">
-          <p className="font-semibold text-zinc-400">💡 Calculation Notes:</p>
-          <p>• Meal Rate = Total Meal Cost / Total Meal Count.</p>
-          <p>• Utilities Share = Calculated per transaction. Divided equally only among the members selected for that cost (custom splits), otherwise divided equally among all members.</p>
-          <p>• Your Spending represents all items you purchased directly on behalf of the mess using your own money.</p>
-          <p>• Net Balance = Your Spending - Meal Cost Share - Utilities Share. Positive balance means you will get paid back; negative means you have to pay the manager.</p>
+        {/* Bottom Panel Grid (50% Calendar Tracker, 50% Explanation Notes) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+          {/* Meal logging calendar tracker */}
+          <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-5 space-y-4 backdrop-blur flex flex-col justify-between">
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-base font-semibold text-zinc-200 font-sans">Meal Logs Tracker</h2>
+                <p className="text-xs text-zinc-500 font-sans">Monthly calendar checking visual filled status</p>
+              </div>
+
+              {/* Calendar Grid Header Days */}
+              <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase text-zinc-500 font-sans tracking-wide">
+                <span>Su</span>
+                <span>Mo</span>
+                <span>Tu</span>
+                <span>We</span>
+                <span>Th</span>
+                <span>Fr</span>
+                <span>Sa</span>
+              </div>
+
+              {/* Days Grid */}
+              <div className="grid grid-cols-7 gap-1.5">
+                {/* Spacers for the start of the week */}
+                {Array.from({ length: firstDayIndex }).map((_, i) => (
+                  <div key={`spacer-${i}`} className="aspect-square bg-transparent" />
+                ))}
+
+                {/* Day cells */}
+                {calendarCells.map((day) => {
+                  const { hasHistory, isFuture, dayMealsSum } = getCalendarDayMeta(day);
+                  
+                  // Color codes
+                  let cellClass = "bg-zinc-900/20 text-zinc-600 border border-zinc-900/60"; // Future
+                  if (!isFuture) {
+                    if (hasHistory) {
+                      cellClass = "bg-emerald-950/40 text-emerald-400 border border-emerald-800/40 hover:bg-emerald-900/50";
+                    } else {
+                      cellClass = "bg-rose-950/40 text-rose-400 border border-rose-800/40 hover:bg-rose-900/50";
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={day}
+                      title={
+                        isFuture
+                          ? `Day ${day} (Future)`
+                          : hasHistory
+                          ? `Day ${day}: ${dayMealsSum} total meals logged`
+                          : `Day ${day}: No meal logs added!`
+                      }
+                      className={`aspect-square rounded-lg flex items-center justify-center text-xs font-bold font-sans cursor-pointer transition-colors shadow-sm ${cellClass}`}
+                    >
+                      {day}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Calendar Legend indicators */}
+            <div className="pt-3 border-t border-zinc-800/60 flex flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-500 font-sans font-medium">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded bg-emerald-950/40 border border-emerald-800/40 inline-block" />
+                <span>Logged</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded bg-rose-950/40 border border-rose-800/40 inline-block" />
+                <span>Missing</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded bg-zinc-900/20 border border-zinc-900/60 inline-block" />
+                <span>Future</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Helpful Instructions */}
+          <div className="p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800 text-xs md:text-sm text-zinc-400 space-y-4 flex flex-col justify-between">
+            <div className="space-y-3.5">
+              <p className="text-base font-semibold text-zinc-200 font-sans">💡 Calculation Notes & Formulas</p>
+              <div className="space-y-2 text-zinc-400">
+                <p>• <span className="font-semibold text-white">Meal Rate</span> = Total Meal Cost / Total Meal Count.</p>
+                <p>• <span className="font-semibold text-white">Utilities Share</span> = Calculated per transaction. Divided equally only among the members selected for that cost (custom splits), otherwise divided equally among all members.</p>
+                <p>• <span className="font-semibold text-white">Your Spending</span> represents all items you purchased directly on behalf of the mess using your own money.</p>
+                <p>
+                  {isPayAsYouGo
+                    ? "• • Net Balance = Your Spending - Meal Cost Share - Utilities Share. Positive balance means you will get paid back; negative means you have to pay the manager."
+                    : "• • Net Balance = (Deposited + Your Spending) - Meal Cost Share - Utilities Share. Positive balance means you will get paid back; negative means you have to pay the manager."}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-zinc-950/40 border border-zinc-800/60 text-zinc-500 text-[11px] leading-relaxed">
+              <span className="font-bold text-zinc-400 block mb-1">🏦 Contribution Model active:</span>
+              {isPayAsYouGo
+                ? "Pay-as-you-go model. Out-of-pocket purchases count directly as deposits. No separate advance deposit entries are expected or required to balance sheets."
+                : "Prepaid fund model. Members make advance deposits to the manager. Net balance reflects cash deposits plus purchases minus consumption shares."}
+            </div>
+          </div>
         </div>
       </div>
     </div>

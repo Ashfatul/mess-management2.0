@@ -11,6 +11,7 @@ export default function SettingsPage() {
   // Settings states
   const [messName, setMessName] = useState("");
   const [mealEntryRule, setMealEntryRule] = useState("anyone");
+  const [depositMode, setDepositMode] = useState("prepaid");
   const [updatingSettings, setUpdatingSettings] = useState(false);
   const [settingsStatus, setSettingsStatus] = useState("");
 
@@ -45,6 +46,7 @@ export default function SettingsPage() {
         setMess(messData);
         setMessName(messData.name);
         setMealEntryRule(messData.meal_entry_rule || "anyone");
+        setDepositMode(messData.deposit_mode || "prepaid");
       }
 
       setLoading(false);
@@ -61,12 +63,16 @@ export default function SettingsPage() {
     try {
       const { error } = await supabase
         .from("messes")
-        .update({ name: messName.trim(), meal_entry_rule: mealEntryRule })
+        .update({ 
+          name: messName.trim(), 
+          meal_entry_rule: mealEntryRule,
+          deposit_mode: depositMode
+        })
         .eq("id", profile.mess_id);
 
       if (error) throw error;
 
-      setSettingsStatus("Settings saved successfully!");
+      setSettingsStatus("Settings saved successfully! Reloading...");
       
       const { data: updatedMess } = await supabase
         .from("messes")
@@ -76,8 +82,12 @@ export default function SettingsPage() {
       if (updatedMess) {
         setMess(updatedMess);
         setMessName(updatedMess.name);
+        setMealEntryRule(updatedMess.meal_entry_rule || "anyone");
+        setDepositMode(updatedMess.deposit_mode || "prepaid");
       }
-      setTimeout(() => setSettingsStatus(""), 3500);
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (err: any) {
       setSettingsStatus("Error saving settings: " + err.message);
     } finally {
@@ -335,6 +345,26 @@ export default function SettingsPage() {
                         : mealEntryRule === "member_self_only"
                         ? "👤 Self Logging Only (each logs their own)"
                         : "🔓 Anyone in the Mess can log meals"}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">Deposit & Contribution Model</label>
+                  {isSuperAdmin ? (
+                    <select
+                      value={depositMode}
+                      onChange={(e) => setDepositMode(e.target.value)}
+                      className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm pr-10 appearance-none cursor-pointer font-sans"
+                    >
+                      <option value="prepaid">Prepaid (Members pay cash in advance to manager)</option>
+                      <option value="pay_as_you_go">Pay-as-you-go (Direct spending automatically counts as deposit)</option>
+                    </select>
+                  ) : (
+                    <div className="px-4 py-2.5 rounded-lg bg-zinc-950 text-zinc-300 text-sm font-semibold font-sans">
+                      {depositMode === "pay_as_you_go"
+                        ? "💸 Pay-as-you-go (Spending counts as deposits)"
+                        : "💵 Prepaid deposits to the manager"}
                     </div>
                   )}
                 </div>

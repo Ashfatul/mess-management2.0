@@ -197,6 +197,7 @@ export default function DepositsPage() {
                 <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">Amount (TK)</label>
                 <input
                   type="number"
+                  min="0"
                   required
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}

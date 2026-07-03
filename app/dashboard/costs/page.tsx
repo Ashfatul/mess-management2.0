@@ -341,6 +341,7 @@ export default function CostsPage() {
                               <div className="flex items-center gap-1.5 shrink-0">
                                 <input
                                   type="number"
+                                  min="0"
                                   placeholder="TK"
                                   required
                                   value={customShares[m.id] || ""}
@@ -374,6 +375,7 @@ export default function CostsPage() {
                 <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">Amount (TK)</label>
                 <input
                   type="number"
+                  min="0"
                   required
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
