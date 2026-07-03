@@ -15,8 +15,12 @@ export default function CostsPage() {
   const [category, setCategory] = useState("meal_bazar");
   const [items, setItems] = useState("");
   const [amount, setAmount] = useState("");
+  
+  // Custom split states
   const [sharedAll, setSharedAll] = useState(true);
   const [selectedSharedMembers, setSelectedSharedMembers] = useState<{ [id: string]: boolean }>({});
+  const [customShares, setCustomShares] = useState<{ [id: string]: string }>({});
+  const [isCustomMode, setIsCustomMode] = useState(false);
   
   // List states
   const [costs, setCosts] = useState<any[]>([]);
@@ -118,6 +122,13 @@ export default function CostsPage() {
     }));
   };
 
+  const handleCustomShareChange = (memberId: string, val: string) => {
+    setCustomShares((prev) => ({
+      ...prev,
+      [memberId]: val,
+    }));
+  };
+
   const handleAddCost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
@@ -125,14 +136,41 @@ export default function CostsPage() {
       return;
     }
 
-    // Get list of shared member IDs
-    const sharedIds = sharedAll 
-      ? null 
-      : Object.keys(selectedSharedMembers).filter((id) => selectedSharedMembers[id]);
+    const totalAmountVal = Number(amount);
+    let payloadSharedBy: any = null;
 
-    if (!sharedAll && (!sharedIds || sharedIds.length === 0)) {
-      setStatusMsg("Please select at least one member to share the cost.");
-      return;
+    if (!sharedAll) {
+      const activeCheckedIds = Object.keys(selectedSharedMembers).filter((id) => selectedSharedMembers[id]);
+      if (activeCheckedIds.length === 0) {
+        setStatusMsg("Please select at least one member to share the cost.");
+        return;
+      }
+
+      if (isCustomMode) {
+        // Validate custom split sum
+        let customSum = 0;
+        const customObj: { [id: string]: number } = {};
+        
+        for (const mId of activeCheckedIds) {
+          const mShare = Number(customShares[mId] || 0);
+          if (mShare <= 0) {
+            setStatusMsg("Please enter a valid positive share for all selected members.");
+            return;
+          }
+          customSum += mShare;
+          customObj[mId] = mShare;
+        }
+
+        if (Math.abs(customSum - totalAmountVal) > 0.01) {
+          setStatusMsg(`Sum of custom shares (${customSum} TK) must equal the total amount (${totalAmountVal} TK).`);
+          return;
+        }
+
+        payloadSharedBy = customObj;
+      } else {
+        // Equal split among selected members: store as array of IDs
+        payloadSharedBy = activeCheckedIds;
+      }
     }
 
     setSaving(true);
@@ -147,8 +185,8 @@ export default function CostsPage() {
         date,
         cost_category: category,
         items,
-        amount: Number(amount),
-        shared_by: sharedIds, // Insert RLS shared custom member array
+        amount: totalAmountVal,
+        shared_by: payloadSharedBy,
         added_by: session.user.id,
       });
 
@@ -156,6 +194,7 @@ export default function CostsPage() {
 
       setAmount("");
       setItems("");
+      setCustomShares({});
       setStatusMsg("Cost logged successfully!");
       if (profile?.mess_id) {
         await fetchCosts(profile.mess_id);
@@ -204,17 +243,17 @@ export default function CostsPage() {
         {/* Left Column: Cost Input Form */}
         <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-6 space-y-6 backdrop-blur">
           <div>
-            <h2 className="text-base font-semibold text-zinc-200">Record a Cost</h2>
-            <p className="text-xs text-zinc-500">Record spending for foods, utilities or others</p>
+            <h2 className="text-base font-semibold text-zinc-200 font-sans">Record a Cost</h2>
+            <p className="text-xs text-zinc-500 font-sans">Record spending for foods, utilities or others</p>
           </div>
 
           <form onSubmit={handleAddCost} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1.5">Spender (Who Paid)</label>
+              <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">Spender (Who Paid)</label>
               <select
                 value={buyerId}
                 onChange={(e) => setBuyerId(e.target.value)}
-                className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm pr-10 appearance-none cursor-pointer"
+                className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm pr-10 appearance-none cursor-pointer font-sans"
               >
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -225,11 +264,11 @@ export default function CostsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1.5">Category</label>
+              <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">Category</label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm pr-10 appearance-none cursor-pointer"
+                className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm pr-10 appearance-none cursor-pointer font-sans"
               >
                 {categories.map((cat) => (
                   <option key={cat.value} value={cat.value}>
@@ -240,21 +279,21 @@ export default function CostsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1.5">Date</label>
+              <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">Date</label>
               <input
                 type="date"
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm"
+                className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-sans"
               />
             </div>
 
             {/* Custom Cost Split Member Selector */}
             <div className="border border-zinc-800/80 p-4 rounded-xl bg-zinc-950/20 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-zinc-300">Cost Sharing Split</span>
-                <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
+                <span className="text-xs font-semibold text-zinc-300 font-sans">Cost Sharing Split</span>
+                <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer font-sans">
                   <input
                     type="checkbox"
                     checked={sharedAll}
@@ -266,49 +305,82 @@ export default function CostsPage() {
               </div>
 
               {!sharedAll && (
-                <div className="pt-2 border-t border-zinc-800/60 space-y-2 max-h-40 overflow-y-auto">
-                  <p className="text-[10px] text-zinc-500 uppercase font-semibold">Select members sharing cost:</p>
-                  {members.map((m) => (
-                    <label key={m.id} className="flex items-center gap-2.5 text-xs text-zinc-300 cursor-pointer hover:text-white transition-colors">
+                <div className="pt-2 border-t border-zinc-800/60 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-zinc-500 uppercase font-semibold font-sans">Custom amounts:</span>
+                    <label className="flex items-center gap-1 text-[11px] text-indigo-400 cursor-pointer font-sans font-medium">
                       <input
                         type="checkbox"
-                        checked={selectedSharedMembers[m.id] || false}
-                        onChange={() => handleToggleMemberShare(m.id)}
+                        checked={isCustomMode}
+                        onChange={(e) => setIsCustomMode(e.target.checked)}
                         className="rounded border-zinc-800 bg-zinc-950 text-indigo-600 focus:ring-0"
                       />
-                      {m.full_name || m.email}
+                      Enable custom shares
                     </label>
-                  ))}
+                  </div>
+
+                  <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                    {members.map((m) => {
+                      const isChecked = selectedSharedMembers[m.id] || false;
+                      return (
+                        <div key={m.id} className="flex items-center justify-between gap-2">
+                          <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer hover:text-white transition-colors truncate w-36 font-sans">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => handleToggleMemberShare(m.id)}
+                              className="rounded border-zinc-800 bg-zinc-950 text-indigo-600 focus:ring-0"
+                            />
+                            {m.full_name || m.email}
+                          </label>
+                          
+                          {isCustomMode && isChecked && (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <input
+                                type="number"
+                                placeholder="TK"
+                                required
+                                value={customShares[m.id] || ""}
+                                onChange={(e) => handleCustomShareChange(m.id, e.target.value)}
+                                className="w-16 text-right bg-zinc-950 border border-zinc-800 py-1 px-1.5 rounded text-xs text-white placeholder:text-zinc-600"
+                              />
+                              <span className="text-[10px] text-zinc-500 font-sans">TK</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1.5">Items / Description</label>
+              <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">Items / Description</label>
               <input
                 type="text"
                 required
                 value={items}
                 onChange={(e) => setItems(e.target.value)}
-                className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-200 placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm"
+                className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-200 placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-sans"
                 placeholder="e.g. Rice, Potatoes, Onions, Wifi Bill"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1.5">Amount (TK)</label>
+              <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">Amount (TK)</label>
               <input
                 type="number"
                 required
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-200 placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm"
+                className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-200 placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-sans"
                 placeholder="e.g. 1500"
               />
             </div>
 
             {statusMsg && (
-              <p className={`text-xs ${statusMsg.startsWith("Error") ? "text-red-400" : "text-emerald-400"}`}>
+              <p className={`text-xs font-sans ${statusMsg.startsWith("Error") || statusMsg.includes("must equal") ? "text-red-400" : "text-emerald-400"}`}>
                 {statusMsg}
               </p>
             )}
@@ -316,7 +388,7 @@ export default function CostsPage() {
             <button
               type="submit"
               disabled={saving}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg text-sm shadow-md transition-colors disabled:opacity-50"
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg text-sm shadow-md transition-colors disabled:opacity-50 font-sans"
             >
               {saving ? "Saving..." : "Log Cost"}
             </button>
@@ -324,14 +396,13 @@ export default function CostsPage() {
         </div>
 
         {/* Right Column: Cost Entries Table */}
-        <div className="lg:col-span-2 bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden backdrop-blur flex flex-col h-[600px]">
+        <div className="lg:col-span-2 bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden backdrop-blur flex flex-col h-[640px]">
           <div className="px-6 py-4 border-b border-zinc-800 bg-zinc-900/55 flex justify-between items-center shrink-0">
             <div>
-              <h2 className="font-semibold text-sm md:text-base text-zinc-200">Cost Register</h2>
-              <p className="text-xs text-zinc-500">Record logs for the current month view</p>
+              <h2 className="font-semibold text-sm md:text-base text-zinc-200 font-sans">Cost Register</h2>
+              <p className="text-xs text-zinc-500 font-sans">Record logs for the current month view</p>
             </div>
 
-            {/* Date Filters */}
             <div className="flex gap-2">
               <select
                 value={selectedMonth}
@@ -384,10 +455,16 @@ export default function CostsPage() {
                     const isOwner = c.added_by === profile?.id || profile?.role === "super_admin";
                     const catName = categories.find((cat) => cat.value === c.cost_category)?.name || c.cost_category;
                     
-                    // Construct sharing labels
+                    // Construct sharing labels based on array or object map type
                     let shareLabel = "All Members";
-                    if (c.shared_by && c.shared_by.length > 0) {
-                      shareLabel = `${c.shared_by.length} members`;
+                    if (c.shared_by) {
+                      if (Array.isArray(c.shared_by)) {
+                        shareLabel = `${c.shared_by.length} members`;
+                      } else {
+                        // It is a custom split object
+                        const keysCount = Object.keys(c.shared_by).length;
+                        shareLabel = `${keysCount} members (Custom)`;
+                      }
                     }
 
                     return (
@@ -403,11 +480,11 @@ export default function CostsPage() {
                           {c.items}
                         </td>
                         <td className="px-6 py-4 text-zinc-400 whitespace-nowrap">
-                          <span className="text-xs border border-zinc-800/80 px-2 py-0.5 rounded bg-zinc-900/40">
+                          <span className="text-xs border border-zinc-800/80 px-2 py-0.5 rounded bg-zinc-900/40 font-medium font-sans">
                             👤 {shareLabel}
                           </span>
                         </td>
-                        <td className="px-6 py-4 font-semibold text-white whitespace-nowrap">{c.amount.toFixed(2)} TK</td>
+                        <td className="px-6 py-4 font-bold text-white whitespace-nowrap">{c.amount.toFixed(2)} TK</td>
                         <td className="px-6 py-4 text-right">
                           {isOwner && (
                             <button

@@ -133,11 +133,20 @@ export default function DashboardPage() {
     costs
       .filter((c) => c.cost_category !== "meal_bazar")
       .forEach((c) => {
-        if (c.shared_by && c.shared_by.length > 0) {
-          if (c.shared_by.includes(m.id)) {
-            mOtherCostShare += Number(c.amount) / c.shared_by.length;
+        if (c.shared_by) {
+          if (Array.isArray(c.shared_by)) {
+            // Equal split among checked members array
+            if (c.shared_by.includes(m.id)) {
+              mOtherCostShare += Number(c.amount) / c.shared_by.length;
+            }
+          } else {
+            // Custom split mapping object: { [id]: amount }
+            if (c.shared_by[m.id] !== undefined) {
+              mOtherCostShare += Number(c.shared_by[m.id]);
+            }
           }
         } else {
+          // Shared by everyone equally
           mOtherCostShare += Number(c.amount) / memberCount;
         }
       });
