@@ -110,14 +110,18 @@ export default function DashboardPage() {
 
   // Meal Rate Calculations
   const totalMeals = meals.reduce((sum, m) => sum + Number(m.count || 0), 0);
-  const totalMealCost = costs
+  const totalMealBazarCost = costs
     .filter((c) => c.cost_category === "meal_bazar")
     .reduce((sum, c) => sum + Number(c.amount || 0), 0);
-  const mealRate = totalMeals > 0 ? totalMealCost / totalMeals : 0;
+  const totalGlobalBazarCost = costs
+    .filter((c) => c.cost_category === "global_bazar")
+    .reduce((sum, c) => sum + Number(c.amount || 0), 0);
+  const totalMealCost = totalMealBazarCost + totalGlobalBazarCost;
+  const mealRate = totalMeals > 0 ? totalMealBazarCost / totalMeals : 0;
 
   // Total Other Cost Calculations
   const totalOtherCost = costs
-    .filter((c) => c.cost_category !== "meal_bazar")
+    .filter((c) => c.cost_category !== "meal_bazar" && c.cost_category !== "global_bazar")
     .reduce((sum, c) => sum + Number(c.amount || 0), 0);
 
   // Deposits & Balance Calculations
@@ -133,30 +137,38 @@ export default function DashboardPage() {
 
     const mMealCostShare = mMeals * mealRate;
 
-    let mOtherCostShare = 0;
-    costs
-      .filter((c) => c.cost_category !== "meal_bazar")
-      .forEach((c) => {
-        if (c.shared_by) {
-          if (Array.isArray(c.shared_by)) {
-            if (c.shared_by.includes(m.id)) {
-              mOtherCostShare += Number(c.amount) / c.shared_by.length;
-            }
-          } else {
-            if (c.shared_by[m.id] !== undefined) {
-              mOtherCostShare += Number(c.shared_by[m.id]);
-            }
-          }
-        } else {
-          mOtherCostShare += Number(c.amount) / memberCount;
-        }
-      });
+    const mOtherCostShare = costs
+      .filter((c) => c.cost_category !== "meal_bazar" && c.cost_category !== "global_bazar")
+      .reduce((sum, c) => sum + (Number(c.amount || 0) / memberCount), 0);
 
     const mTotalCostShare = mMealCostShare + mOtherCostShare;
 
     const mDirectSpending = costs
-      .filter((c) => c.profile_id === m.id)
-      .reduce((sum, c) => sum + Number(c.amount || 0), 0);
+      .reduce((sum, c) => {
+        if (c.profile_id === m.id) {
+          // Sole spender
+          return sum + Number(c.amount || 0);
+        } else if (c.profile_id === null) {
+          // Shared spender (multiple people paid collectively)
+          if (c.shared_by) {
+            if (Array.isArray(c.shared_by)) {
+              // Paid equally by a subset of members
+              if (c.shared_by.includes(m.id)) {
+                return sum + (Number(c.amount || 0) / c.shared_by.length);
+              }
+            } else {
+              // Custom amounts paid by members
+              if (c.shared_by[m.id] !== undefined) {
+                return sum + Number(c.shared_by[m.id] || 0);
+              }
+            }
+          } else {
+            // Paid equally by everyone (shared_by is null)
+            return sum + (Number(c.amount || 0) / memberCount);
+          }
+        }
+        return sum;
+      }, 0);
 
     // If pay_as_you_go: deposit counts as direct spending
     const mDeposited = isPayAsYouGo 

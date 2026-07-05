@@ -115,18 +115,72 @@ export default function CostsPage() {
     init();
   }, [selectedMonth, selectedYear]);
 
+  const recalculateTotalFromCustomShares = (
+    currentCustomShares: { [id: string]: string }, 
+    currentSharedMembers: { [id: string]: boolean }
+  ) => {
+    const activeCheckedIds = Object.keys(currentSharedMembers).filter((id) => currentSharedMembers[id]);
+    let total = 0;
+    activeCheckedIds.forEach((id) => {
+      total += Number(currentCustomShares[id] || 0);
+    });
+    setAmount(total > 0 ? total.toString() : "");
+  };
+
   const handleToggleMemberShare = (memberId: string) => {
-    setSelectedSharedMembers((prev) => ({
-      ...prev,
-      [memberId]: !prev[memberId],
-    }));
+    setSelectedSharedMembers((prev) => {
+      const updated = {
+        ...prev,
+        [memberId]: !prev[memberId],
+      };
+      if (isCustomMode) {
+        recalculateTotalFromCustomShares(customShares, updated);
+      }
+      return updated;
+    });
   };
 
   const handleCustomShareChange = (memberId: string, val: string) => {
-    setCustomShares((prev) => ({
-      ...prev,
-      [memberId]: val,
-    }));
+    setCustomShares((prev) => {
+      const updated = {
+        ...prev,
+        [memberId]: val,
+      };
+      if (isCustomMode) {
+        recalculateTotalFromCustomShares(updated, selectedSharedMembers);
+      }
+      return updated;
+    });
+  };
+
+  const handleToggleCustomMode = (enabled: boolean) => {
+    setIsCustomMode(enabled);
+    if (enabled) {
+      recalculateTotalFromCustomShares(customShares, selectedSharedMembers);
+    }
+  };
+
+  const handleCategoryChange = (val: string) => {
+    setCategory(val);
+    if (val === "wifi") {
+      setItems("Wifi Bill");
+    } else if (val === "gas") {
+      setItems("Gas Bill");
+    } else if (val === "electricity") {
+      setItems("Electricity Bill");
+    } else if (val === "meal_bazar") {
+      setItems("Regular Meal Bazar");
+    } else if (val === "global_bazar") {
+      setItems("Monthly Global Bazar");
+    } else {
+      setItems("");
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "";
+    const [year, month, day] = dateStr.split("-");
+    return `${day}/${month}/${year}`;
   };
 
   const handleAddCost = async (e: React.FormEvent) => {
@@ -138,39 +192,45 @@ export default function CostsPage() {
 
     const totalAmountVal = Number(amount);
     let payloadSharedBy: any = null;
+    const isSharedSpender = buyerId === "shared";
 
-    if (!sharedAll) {
-      const activeCheckedIds = Object.keys(selectedSharedMembers).filter((id) => selectedSharedMembers[id]);
-      if (activeCheckedIds.length === 0) {
-        setStatusMsg("Please select at least one member to share the cost.");
-        return;
-      }
-
-      if (isCustomMode) {
-        // Validate custom split sum
-        let customSum = 0;
-        const customObj: { [id: string]: number } = {};
-        
-        for (const mId of activeCheckedIds) {
-          const mShare = Number(customShares[mId] || 0);
-          if (mShare <= 0) {
-            setStatusMsg("Please enter a valid positive share for all selected members.");
-            return;
-          }
-          customSum += mShare;
-          customObj[mId] = mShare;
-        }
-
-        if (Math.abs(customSum - totalAmountVal) > 0.01) {
-          setStatusMsg(`Sum of custom shares (${customSum} TK) must equal the total amount (${totalAmountVal} TK).`);
+    if (isSharedSpender) {
+      if (!sharedAll) {
+        const activeCheckedIds = Object.keys(selectedSharedMembers).filter((id) => selectedSharedMembers[id]);
+        if (activeCheckedIds.length === 0) {
+          setStatusMsg("Please select at least one member to share the cost.");
           return;
         }
 
-        payloadSharedBy = customObj;
-      } else {
-        // Equal split among selected members: store as array of IDs
-        payloadSharedBy = activeCheckedIds;
+        if (isCustomMode) {
+          // Validate custom split sum
+          let customSum = 0;
+          const customObj: { [id: string]: number } = {};
+          
+          for (const mId of activeCheckedIds) {
+            const mShare = Number(customShares[mId] || 0);
+            if (mShare <= 0) {
+              setStatusMsg("Please enter a valid positive share for all selected members.");
+              return;
+            }
+            customSum += mShare;
+            customObj[mId] = mShare;
+          }
+
+          if (Math.abs(customSum - totalAmountVal) > 0.01) {
+            setStatusMsg(`Sum of custom shares (${customSum} TK) must equal the total amount (${totalAmountVal} TK).`);
+            return;
+          }
+
+          payloadSharedBy = customObj;
+        } else {
+          // Equal split among selected members: store as array of IDs
+          payloadSharedBy = activeCheckedIds;
+        }
       }
+    } else {
+      // Specific user is Spender: cost is shared by all members by default
+      payloadSharedBy = null;
     }
 
     setSaving(true);
@@ -181,7 +241,7 @@ export default function CostsPage() {
       if (!session) return;
 
       const { error } = await supabase.from("costs").insert({
-        profile_id: buyerId,
+        profile_id: isSharedSpender ? null : buyerId,
         date,
         cost_category: category,
         items,
@@ -250,7 +310,7 @@ export default function CostsPage() {
               <p className="text-xs text-zinc-500 font-sans">Record spending for foods, utilities or others</p>
             </div>
 
-            <form onSubmit={handleAddCost} className="space-y-4">
+             <form onSubmit={handleAddCost} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">Spender (Who Paid)</label>
                 <select
@@ -258,6 +318,7 @@ export default function CostsPage() {
                   onChange={(e) => setBuyerId(e.target.value)}
                   className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm pr-10 appearance-none cursor-pointer font-sans"
                 >
+                  <option value="shared">Shared (Paid from Mess Box / Shared Fund)</option>
                   {members.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.full_name || m.email}
@@ -270,7 +331,7 @@ export default function CostsPage() {
                 <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">Category</label>
                 <select
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
                   className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm pr-10 appearance-none cursor-pointer font-sans"
                 >
                   {categories.map((cat) => (
@@ -292,72 +353,74 @@ export default function CostsPage() {
                 />
               </div>
 
-              {/* Custom Cost Split Member Selector */}
-              <div className="border border-zinc-800/80 p-4 rounded-xl bg-zinc-950/20 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-zinc-300 font-sans">Cost Sharing Split</span>
-                  <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer font-sans">
-                    <input
-                      type="checkbox"
-                      checked={sharedAll}
-                      onChange={(e) => setSharedAll(e.target.checked)}
-                      className="rounded border-zinc-800 bg-zinc-950 text-indigo-600 focus:ring-0"
-                    />
-                    Share with all members
-                  </label>
-                </div>
-
-                {!sharedAll && (
-                  <div className="pt-2 border-t border-zinc-800/60 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-zinc-500 uppercase font-semibold font-sans">Custom amounts:</span>
-                      <label className="flex items-center gap-1 text-[11px] text-indigo-400 cursor-pointer font-sans font-medium">
-                        <input
-                          type="checkbox"
-                          checked={isCustomMode}
-                          onChange={(e) => setIsCustomMode(e.target.checked)}
-                          className="rounded border-zinc-800 bg-zinc-950 text-indigo-600 focus:ring-0"
-                        />
-                        Enable custom shares
-                      </label>
-                    </div>
-
-                    <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
-                      {members.map((m) => {
-                        const isChecked = selectedSharedMembers[m.id] || false;
-                        return (
-                          <div key={m.id} className="flex items-center justify-between gap-2">
-                            <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer hover:text-white transition-colors truncate min-w-0 flex-1 font-sans">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => handleToggleMemberShare(m.id)}
-                                className="rounded border-zinc-800 bg-zinc-950 text-indigo-600 focus:ring-0 shrink-0"
-                              />
-                              <span className="truncate">{m.full_name || m.email}</span>
-                            </label>
-
-                            {isCustomMode && isChecked && (
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  placeholder="TK"
-                                  required
-                                  value={customShares[m.id] || ""}
-                                  onChange={(e) => handleCustomShareChange(m.id, e.target.value)}
-                                  className="w-14 sm:w-16 text-right bg-zinc-950 border border-zinc-800 py-1 px-1.5 rounded text-xs text-white placeholder:text-zinc-600"
-                                />
-                                <span className="text-[10px] text-zinc-500 font-sans">TK</span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+              {/* Custom Cost Split Member Selector - only applies to Shared Box spending */}
+              {buyerId === "shared" && (
+                <div className="border border-zinc-800/80 p-4 rounded-xl bg-zinc-950/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-zinc-300 font-sans">Cost Sharing Split</span>
+                    <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer font-sans">
+                      <input
+                        type="checkbox"
+                        checked={sharedAll}
+                        onChange={(e) => setSharedAll(e.target.checked)}
+                        className="rounded border-zinc-800 bg-zinc-950 text-indigo-600 focus:ring-0"
+                      />
+                      Share with all members
+                    </label>
                   </div>
-                )}
-              </div>
+
+                  {!sharedAll && (
+                    <div className="pt-2 border-t border-zinc-800/60 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-zinc-500 uppercase font-semibold font-sans">Custom amounts:</span>
+                        <label className="flex items-center gap-1 text-[11px] text-indigo-400 cursor-pointer font-sans font-medium">
+                          <input
+                            type="checkbox"
+                            checked={isCustomMode}
+                            onChange={(e) => handleToggleCustomMode(e.target.checked)}
+                            className="rounded border-zinc-800 bg-zinc-950 text-indigo-600 focus:ring-0"
+                          />
+                          Enable custom shares
+                        </label>
+                      </div>
+
+                      <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                        {members.map((m) => {
+                          const isChecked = selectedSharedMembers[m.id] || false;
+                          return (
+                            <div key={m.id} className="flex items-center justify-between gap-2">
+                              <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer hover:text-white transition-colors truncate min-w-0 flex-1 font-sans">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => handleToggleMemberShare(m.id)}
+                                  className="rounded border-zinc-800 bg-zinc-950 text-indigo-600 focus:ring-0 shrink-0"
+                                />
+                                <span className="truncate">{m.full_name || m.email}</span>
+                              </label>
+
+                              {isCustomMode && isChecked && (
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    placeholder="TK"
+                                    required
+                                    value={customShares[m.id] || ""}
+                                    onChange={(e) => handleCustomShareChange(m.id, e.target.value)}
+                                    className="w-14 sm:w-16 text-right bg-zinc-950 border border-zinc-800 py-1 px-1.5 rounded text-xs text-white placeholder:text-zinc-600"
+                                  />
+                                  <span className="text-[10px] text-zinc-500 font-sans">TK</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">Items / Description</label>
@@ -372,15 +435,18 @@ export default function CostsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">Amount (TK)</label>
+                <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">
+                  Amount (TK) {isCustomMode && buyerId === "shared" && <span className="text-xs text-indigo-400 font-normal ml-1">(Calculated)</span>}
+                </label>
                 <input
                   type="number"
                   min="0"
                   required
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-200 placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-sans"
-                  placeholder="e.g. 1500"
+                  disabled={isCustomMode && buyerId === "shared"}
+                  className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-200 placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-sans disabled:opacity-50"
+                  placeholder={isCustomMode && buyerId === "shared" ? "Sum of custom shares" : "e.g. 1500"}
                 />
               </div>
 
@@ -456,14 +522,18 @@ export default function CostsPage() {
                     </tr>
                   ) : (
                     costs.map((c) => {
-                      const mappedSpender = c.profiles?.full_name || "Unknown";
+                      const mappedSpender = c.profiles?.full_name || (c.profile_id ? "Unknown" : "Shared / Mess Box");
                       const isOwner = c.added_by === profile?.id || profile?.role === "super_admin";
                       const catName = categories.find((cat) => cat.value === c.cost_category)?.name || c.cost_category;
 
                       let shareLabel = "All Members";
                       if (c.shared_by) {
                         if (Array.isArray(c.shared_by)) {
-                          shareLabel = `${c.shared_by.length} members`;
+                          if (c.shared_by.length === 1 && c.shared_by[0] === c.profile_id) {
+                            shareLabel = "Personal Expense";
+                          } else {
+                            shareLabel = `${c.shared_by.length} members`;
+                          }
                         } else {
                           const keysCount = Object.keys(c.shared_by).length;
                           shareLabel = `${keysCount} members (Custom)`;
@@ -472,7 +542,7 @@ export default function CostsPage() {
 
                       return (
                         <tr key={c.id} className="hover:bg-zinc-900/10 transition-colors text-sm">
-                          <td className="px-4 sm:px-6 py-4 text-zinc-400 font-medium whitespace-nowrap">{c.date}</td>
+                          <td className="px-4 sm:px-6 py-4 text-zinc-400 font-medium whitespace-nowrap">{formatDate(c.date)}</td>
                           <td className="px-4 sm:px-6 py-4 text-zinc-200 font-semibold whitespace-nowrap">{mappedSpender}</td>
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs">
