@@ -108,6 +108,22 @@ CREATE TABLE costs (
 -- Enable RLS on costs
 ALTER TABLE costs ENABLE ROW LEVEL SECURITY;
 
+-- Create table for Settlements
+CREATE TABLE settlements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    mess_id UUID REFERENCES messes(id) ON DELETE CASCADE NOT NULL,
+    year INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    profile_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+    status TEXT CHECK (status IN ('pending', 'settled')) NOT NULL DEFAULT 'pending',
+    settled_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    settled_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    UNIQUE (mess_id, year, month, profile_id)
+);
+
+-- Enable RLS on settlements
+ALTER TABLE settlements ENABLE ROW LEVEL SECURITY;
+
 ----------------------------------------------------
 -- Row Level Security (RLS) Policies (Recursive-Safe Version)
 ----------------------------------------------------
@@ -211,6 +227,17 @@ CREATE POLICY "Allow costs manage in same mess" ON costs
             SELECT 1 FROM public.profiles 
             WHERE public.profiles.id = auth.uid() AND public.profiles.mess_id = get_my_mess_id()
         )
+    );
+
+-- Settlements Policies
+CREATE POLICY "Allow read settlements for mess" ON settlements
+    FOR SELECT TO authenticated USING (
+        mess_id = get_my_mess_id()
+    );
+
+CREATE POLICY "Allow super admin manage settlements" ON settlements
+    FOR ALL TO authenticated USING (
+        mess_id = get_my_mess_id() AND is_super_admin()
     );
 
 -- Trigger to create a profile automatically when a new user signs up in supabase auth

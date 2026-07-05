@@ -133,6 +133,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     ...(mess?.deposit_mode !== "pay_as_you_go"
       ? [{ name: "Deposits", href: "/dashboard/deposits", icon: "💵" }]
       : []),
+    { name: "Month Settlements", href: "/dashboard/settlements", icon: "💼" },
     { name: "Members", href: "/dashboard/members", icon: "👥" },
     { name: "Settings", href: "/dashboard/settings", icon: "⚙️" },
   ];

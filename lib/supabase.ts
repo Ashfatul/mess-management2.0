@@ -13,6 +13,7 @@ interface MockDB {
   meals: any[];
   deposits: any[];
   costs: any[];
+  settlements: any[];
   currentUser: any | null;
 }
 
@@ -58,6 +59,7 @@ const INITIAL_MOCK_DATA: MockDB = {
     { id: "c5", profile_id: "user-shariful", date: "2026-05-05", cost_category: "electricity", items: "Electricity Bill", amount: 400.0 },
     { id: "c6", profile_id: "user-ashfatul", date: "2026-05-07", cost_category: "wifi", items: "Wifi Bill", amount: 680.0 },
   ],
+  settlements: [],
   currentUser: {
     id: "user-ashfatul",
     email: "ashfatul@example.com",
