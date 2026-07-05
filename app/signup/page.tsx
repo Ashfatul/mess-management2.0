@@ -66,7 +66,8 @@ function SignupForm() {
               setInviteData(data);
             }
           } else {
-            setErrorMsg("Invalid invite token. Registering as regular user.");
+            console.error("Token verification error:", error);
+            setErrorMsg(`Invalid invite token (${error?.message || "Not found"}). Registering as regular user.`);
           }
           setCheckingToken(false);
         });

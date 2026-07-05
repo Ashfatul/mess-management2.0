@@ -152,6 +152,11 @@ CREATE POLICY "Allow read invites for mess" ON invites
         mess_id = get_my_mess_id()
     );
 
+CREATE POLICY "Allow public read of invites by token" ON invites
+    FOR SELECT TO anon, authenticated USING (
+        status = 'pending'
+    );
+
 CREATE POLICY "Allow create/delete invites for super admin" ON invites
     FOR ALL TO authenticated USING (
         mess_id = get_my_mess_id() AND is_super_admin()
