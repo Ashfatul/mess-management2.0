@@ -15,6 +15,13 @@ export default function SettingsPage() {
   const [updatingSettings, setUpdatingSettings] = useState(false);
   const [settingsStatus, setSettingsStatus] = useState("");
 
+  // Password states
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [passwordStatus, setPasswordStatus] = useState("");
+
   // Wipe levels of confirmation
   const [showWipeModal, setShowWipeModal] = useState(false);
   const [wipeConfirmText, setWipeConfirmText] = useState("");
@@ -92,6 +99,52 @@ export default function SettingsPage() {
       setSettingsStatus("Error saving settings: " + err.message);
     } finally {
       setUpdatingSettings(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword) {
+      setPasswordStatus("Error: Please enter your current password.");
+      return;
+    }
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordStatus("Error: Password must be at least 6 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordStatus("Error: Passwords do not match.");
+      return;
+    }
+    
+    setUpdatingPassword(true);
+    setPasswordStatus("");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || !session.user.email) throw new Error("Not logged in");
+
+      // Verify current password by attempting to sign in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: session.user.email,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        throw new Error("Incorrect current password.");
+      }
+
+      // If successful, update to new password
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateError) throw updateError;
+      
+      setPasswordStatus("Password updated successfully!");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      setPasswordStatus("Error: " + err.message);
+    } finally {
+      setUpdatingPassword(false);
     }
   };
 
@@ -384,6 +437,62 @@ export default function SettingsPage() {
                     {updatingSettings ? "Saving Settings..." : "Save Settings"}
                   </button>
                 )}
+              </form>
+            </div>
+
+            <div className="p-4 sm:p-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 backdrop-blur space-y-5 sm:space-y-6 mt-6">
+              <h2 className="text-base font-semibold text-zinc-200 border-b border-zinc-800 pb-3 font-sans">Account Security</h2>
+              
+              <form onSubmit={handleUpdatePassword} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">Current Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-sans"
+                    placeholder="Enter current password"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">New Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-sans"
+                    placeholder="Enter new password (min. 6 characters)"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">Confirm New Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-sans"
+                    placeholder="Re-enter new password"
+                  />
+                </div>
+
+                {passwordStatus && (
+                  <p className={`text-xs font-sans ${passwordStatus.startsWith("Error") ? "text-red-400" : "text-emerald-400"}`}>
+                    {passwordStatus}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={updatingPassword}
+                  className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold rounded-lg text-sm transition-colors shadow-md disabled:opacity-50 font-sans"
+                >
+                  {updatingPassword ? "Updating Password..." : "Change Password"}
+                </button>
               </form>
             </div>
           </div>

@@ -23,6 +23,7 @@ export default function CostsPage() {
   const [selectedSharedMembers, setSelectedSharedMembers] = useState<{ [id: string]: boolean }>({});
   const [customShares, setCustomShares] = useState<{ [id: string]: string }>({});
   const [isCustomMode, setIsCustomMode] = useState(false);
+  const [editingCostId, setEditingCostId] = useState<string | null>(null);
   
   // List states
   const [costs, setCosts] = useState<any[]>([]);
@@ -185,6 +186,63 @@ export default function CostsPage() {
     return `${day}/${month}/${year}`;
   };
 
+  const handleEditClick = (cost: any) => {
+    setEditingCostId(cost.id);
+    setDate(cost.date);
+    setBuyerId(cost.profile_id || "shared");
+    setCategory(cost.cost_category);
+    setItems(cost.items);
+    setAmount(cost.amount.toString());
+
+    if (!cost.profile_id && cost.shared_by) {
+      setSharedAll(false);
+      const newChecked: { [id: string]: boolean } = {};
+      const newCustom: { [id: string]: string } = {};
+
+      if (Array.isArray(cost.shared_by)) {
+        setIsCustomMode(false);
+        members.forEach(m => newChecked[m.id] = cost.shared_by.includes(m.id));
+      } else {
+        setIsCustomMode(true);
+        members.forEach(m => {
+          if (cost.shared_by[m.id]) {
+            newChecked[m.id] = true;
+            newCustom[m.id] = cost.shared_by[m.id].toString();
+          } else {
+            newChecked[m.id] = false;
+          }
+        });
+        setCustomShares(newCustom);
+      }
+      setSelectedSharedMembers(newChecked);
+    } else {
+      setSharedAll(true);
+      setIsCustomMode(false);
+      setCustomShares({});
+      const initialChecked: { [id: string]: boolean } = {};
+      members.forEach((m: any) => initialChecked[m.id] = true);
+      setSelectedSharedMembers(initialChecked);
+    }
+    
+    // scroll to top to see form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCostId(null);
+    setDate(new Date().toISOString().split("T")[0]);
+    setBuyerId(profile?.id || "");
+    setCategory("meal_bazar");
+    setItems("");
+    setAmount("");
+    setSharedAll(true);
+    setIsCustomMode(false);
+    setCustomShares({});
+    const initialChecked: { [id: string]: boolean } = {};
+    members.forEach((m: any) => initialChecked[m.id] = true);
+    setSelectedSharedMembers(initialChecked);
+  };
+
   const handleAddCost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
@@ -242,7 +300,7 @@ export default function CostsPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const { error } = await supabase.from("costs").insert({
+      const payload = {
         profile_id: isSharedSpender ? null : buyerId,
         date,
         cost_category: category,
@@ -250,14 +308,28 @@ export default function CostsPage() {
         amount: totalAmountVal,
         shared_by: payloadSharedBy,
         added_by: session.user.id,
-      });
+      };
 
-      if (error) throw error;
+      if (editingCostId) {
+        const { error } = await supabase.from("costs").update(payload).eq("id", editingCostId);
+        if (error) throw error;
+        setStatusMsg("Cost updated successfully!");
+        setEditingCostId(null);
+      } else {
+        const { error } = await supabase.from("costs").insert(payload);
+        if (error) throw error;
+        setStatusMsg("Cost logged successfully!");
+      }
 
       setAmount("");
       setItems("");
       setCustomShares({});
-      setStatusMsg("Cost logged successfully!");
+      
+      // Reset form specifically for Date
+      setDate(new Date().toISOString().split("T")[0]);
+      setCategory("meal_bazar");
+      setBuyerId(profile?.id || "");
+
       if (profile?.mess_id) {
         await fetchCosts(profile.mess_id);
       }
@@ -308,8 +380,12 @@ export default function CostsPage() {
           {/* Left Column: Cost Input Form */}
           <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4 sm:p-6 space-y-5 sm:space-y-6 backdrop-blur">
             <div>
-              <h2 className="text-base font-semibold text-zinc-200 font-sans">Record a Cost</h2>
-              <p className="text-xs text-zinc-500 font-sans">Record spending for foods, utilities or others</p>
+              <h2 className="text-base font-semibold text-zinc-200 font-sans">
+                {editingCostId ? "Edit Cost" : "Record a Cost"}
+              </h2>
+              <p className="text-xs text-zinc-500 font-sans">
+                {editingCostId ? "Update existing spending" : "Record spending for foods, utilities or others"}
+              </p>
             </div>
 
              <form onSubmit={handleAddCost} className="space-y-4">
@@ -473,13 +549,25 @@ export default function CostsPage() {
                 </p>
               )}
 
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg text-sm shadow-md transition-colors disabled:opacity-50 font-sans"
-              >
-                {saving ? "Saving..." : "Log Cost"}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg text-sm shadow-md transition-colors disabled:opacity-50 font-sans"
+                >
+                  {saving ? "Saving..." : editingCostId ? "Update Cost" : "Log Cost"}
+                </button>
+                {editingCostId && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    disabled={saving}
+                    className="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold rounded-lg text-sm shadow-md transition-colors disabled:opacity-50 font-sans"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
             </form>
           </div>
 
@@ -524,10 +612,10 @@ export default function CostsPage() {
                     <th className="px-4 sm:px-6 py-3.5 bg-zinc-950">Date</th>
                     <th className="px-4 sm:px-6 py-3.5">Spender</th>
                     <th className="px-4 sm:px-6 py-3.5">Category</th>
-                    <th className="px-4 sm:px-6 py-3.5">Description</th>
+                    <th className="px-4 sm:px-6 py-3.5 bg-zinc-950">Description</th>
                     <th className="px-4 sm:px-6 py-3.5">Share Details</th>
                     <th className="px-4 sm:px-6 py-3.5">Amount</th>
-                    <th className="px-4 sm:px-6 py-3.5 text-right">Action</th>
+                    <th className="px-4 sm:px-6 py-3.5 text-right sticky right-0 bg-zinc-950 z-20 shadow-[-8px_0_12px_rgba(0,0,0,0.5)]">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/40">
@@ -575,15 +663,24 @@ export default function CostsPage() {
                             </span>
                           </td>
                           <td className="px-4 sm:px-6 py-4 font-bold text-white whitespace-nowrap">{c.amount.toFixed(2)} TK</td>
-                          <td className="px-4 sm:px-6 py-4 text-right">
+                          <td className="px-4 sm:px-6 py-4 text-right sticky right-0 bg-zinc-950 shadow-[-8px_0_12px_rgba(0,0,0,0.3)] whitespace-nowrap">
                             {isOwner && (
-                              <button
-                                onClick={() => handleDeleteCost(c.id)}
-                                className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1.5 rounded-md transition-colors"
-                                title="Delete"
-                              >
-                                🗑️
-                              </button>
+                              <div className="flex justify-end gap-1.5 bg-zinc-950">
+                                <button
+                                  onClick={() => handleEditClick(c)}
+                                  className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 p-1.5 rounded-md transition-colors"
+                                  title="Edit"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCost(c.id)}
+                                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1.5 rounded-md transition-colors"
+                                  title="Delete"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
