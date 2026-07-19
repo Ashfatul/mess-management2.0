@@ -290,17 +290,19 @@ export default function DashboardPage() {
           </div>
 
           {/* Month/Year selector */}
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(Number(e.target.value))}
-            className="bg-transparent text-xs sm:text-sm border-0 focus:ring-0 text-zinc-200 py-1.5 px-2 sm:px-3 rounded-lg hover:bg-zinc-800 cursor-pointer pr-7 sm:pr-8 appearance-none"
-          >
-            {months.map((m) => (
-              <option key={m.value} value={m.value} className="bg-zinc-900 text-zinc-200">
-                {m.name}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center border-r border-zinc-800 pr-1">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              className="bg-transparent text-xs sm:text-sm border-0 focus:ring-0 text-zinc-200 py-1.5 px-2 sm:px-3 rounded-lg hover:bg-zinc-800 cursor-pointer pr-7 sm:pr-8 appearance-none"
+            >
+              {months.map((m) => (
+                <option key={m.value} value={m.value} className="bg-zinc-900 text-zinc-200">
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <select
             value={selectedYear}
@@ -319,7 +321,7 @@ export default function DashboardPage() {
       {/* Scrollable Page Content */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8">
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className={`grid gap-3 sm:gap-4 ${isPayAsYouGo && viewContext === "overall" ? "grid-cols-1 lg:grid-cols-3" : "grid-cols-2 lg:grid-cols-4"}`}>
           <div className="bg-zinc-900/50 border border-zinc-800 p-4 sm:p-5 rounded-2xl backdrop-blur flex flex-col justify-between gap-2">
             <span className="text-[11px] sm:text-xs md:text-sm text-zinc-400 font-medium leading-snug">{cardTitleDeposit}</span>
             <h3 className="text-lg sm:text-xl md:text-3xl font-bold text-white break-words">
@@ -341,12 +343,14 @@ export default function DashboardPage() {
             </h3>
           </div>
 
-          <div className="bg-zinc-900/50 border border-zinc-800 p-4 sm:p-5 rounded-2xl backdrop-blur flex flex-col justify-between gap-2">
-            <span className="text-[11px] sm:text-xs md:text-sm text-zinc-400 font-medium leading-snug">{cardTitleBalance}</span>
-            <h3 className={`text-lg sm:text-xl md:text-3xl font-bold break-words ${isBalancePositive ? "text-emerald-400" : "text-red-400"}`}>
-              {displayBalance.toLocaleString()} <span className="text-[10px] sm:text-xs md:text-sm font-normal text-zinc-500">TK</span>
-            </h3>
-          </div>
+          {!(isPayAsYouGo && viewContext === "overall") && (
+            <div className="bg-zinc-900/50 border border-zinc-800 p-4 sm:p-5 rounded-2xl backdrop-blur flex flex-col justify-between gap-2">
+              <span className="text-[11px] sm:text-xs md:text-sm text-zinc-400 font-medium leading-snug">{cardTitleBalance}</span>
+              <h3 className={`text-lg sm:text-xl md:text-3xl font-bold break-words ${isBalancePositive ? "text-emerald-400" : "text-red-400"}`}>
+                {displayBalance.toLocaleString()} <span className="text-[10px] sm:text-xs md:text-sm font-normal text-zinc-500">TK</span>
+              </h3>
+            </div>
+          )}
         </div>
 
         {/* Calculations details card (Full Width) */}
