@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 export default function DepositsPage() {
   const [profile, setProfile] = useState<any>(null);
@@ -34,6 +36,12 @@ export default function DepositsPage() {
     { value: 11, name: "November" },
     { value: 12, name: "December" },
   ];
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "";
+    const [year, month, day] = dateStr.split("-");
+    return `${day}/${month}/${year}`;
+  };
 
   const fetchDeposits = async (messId: string) => {
     const startDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`;
@@ -183,14 +191,29 @@ export default function DepositsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-400 mb-1.5 font-sans">Date</label>
-                <input
-                  type="date"
-                  required
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-sans"
-                />
+                <label className="flex items-center gap-2 text-sm font-medium text-zinc-400 mb-1.5 font-sans">
+                  Date
+                  <span className="group relative cursor-pointer flex items-center justify-center w-4 h-4 rounded-full bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors text-[10px]">
+                    i
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block bg-zinc-800 text-white text-[10px] py-1 px-2 rounded whitespace-nowrap shadow-xl border border-zinc-700 z-50">
+                      Format: DD/MM/YYYY
+                    </span>
+                  </span>
+                </label>
+                <div className="w-full">
+                  <DatePicker
+                    selected={date ? new Date(date) : new Date()}
+                    onChange={(d: Date | null) => {
+                      if (d) {
+                        const offsetDate = new Date(d.getTime() - (d.getTimezoneOffset() * 60000));
+                        setDate(offsetDate.toISOString().split("T")[0]);
+                      }
+                    }}
+                    dateFormat="dd/MM/yyyy"
+                    className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-sans"
+                    wrapperClassName="w-full"
+                  />
+                </div>
               </div>
 
               <div>
@@ -279,7 +302,7 @@ export default function DepositsPage() {
                       const isOwner = d.added_by === profile?.id || profile?.role === "super_admin";
                       return (
                         <tr key={d.id} className="hover:bg-zinc-900/10 transition-colors text-sm">
-                          <td className="px-4 sm:px-6 py-4 text-zinc-400 font-medium whitespace-nowrap">{d.date}</td>
+                          <td className="px-4 sm:px-6 py-4 text-zinc-400 font-medium whitespace-nowrap">{formatDate(d.date)}</td>
                           <td className="px-4 sm:px-6 py-4 font-bold text-white whitespace-nowrap">{depositorName}</td>
                           <td className="px-4 sm:px-6 py-4 font-bold text-emerald-400 whitespace-nowrap">+{d.amount.toFixed(2)} TK</td>
                           <td className="px-4 sm:px-6 py-4 text-right">

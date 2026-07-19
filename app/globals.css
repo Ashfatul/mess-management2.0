@@ -288,3 +288,34 @@ html.light-mode aside.bg-zinc-900\/95 {
 html.light-mode .bg-indigo-600 {
   background-color: #4f46e5 !important;
 }
+
+/* DatePicker Dark Mode Overrides */
+.react-datepicker {
+  @apply bg-zinc-900 border-zinc-800 text-zinc-200 font-sans;
+}
+.react-datepicker__header {
+  @apply bg-zinc-950 border-zinc-800;
+}
+.react-datepicker__current-month, .react-datepicker-time__header, .react-datepicker-year-header {
+  @apply text-zinc-200;
+}
+.react-datepicker__day-name, .react-datepicker__day, .react-datepicker__time-name {
+  @apply text-zinc-400 hover:!bg-zinc-700 hover:!text-white transition-colors;
+}
+.react-datepicker__day--selected, .react-datepicker__day--keyboard-selected {
+  @apply !bg-indigo-600 !text-white hover:!bg-indigo-500;
+}
+.react-datepicker__day--outside-month {
+  @apply opacity-50;
+}
+
+
+/* Number Input Arrows Hide */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}

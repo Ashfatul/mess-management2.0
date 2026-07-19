@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 export default function MealsPage() {
   const [profile, setProfile] = useState<any>(null);
@@ -39,8 +41,14 @@ export default function MealsPage() {
     return new Date(year, month, 0).getDate();
   };
 
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "";
+    const [year, month, day] = dateStr.split("-");
+    return `${day}/${month}/${year}`;
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchInitialData = async () => {
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -54,7 +62,6 @@ export default function MealsPage() {
       if (!profileData || !profileData.mess_id) return;
       setProfile(profileData);
 
-      // Fetch mess details
       const { data: messData } = await supabase
         .from("messes")
         .select("*")
@@ -63,7 +70,6 @@ export default function MealsPage() {
       
       if (messData) setMess(messData);
 
-      // Fetch mess members
       const { data: membersData } = await supabase
         .from("profiles")
         .select("*")
@@ -72,7 +78,15 @@ export default function MealsPage() {
       const activeMembers = membersData || [];
       setMembers(activeMembers);
 
-      // Fetch all monthly meals to construct monthly table
+      setLoading(false);
+    };
+
+    fetchInitialData();
+  }, []);
+
+  useEffect(() => {
+    const fetchMonthlyMeals = async () => {
+      if (!profile) return;
       const startDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`;
       const lastDay = getDaysInMonth(selectedMonth, selectedYear);
       const endDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${lastDay}`;
@@ -84,25 +98,30 @@ export default function MealsPage() {
         .lte("date", endDate);
       
       setMonthlyMeals(mealsData || []);
+    };
 
-      // Initialize daily logger counts for the selectedDate
+    fetchMonthlyMeals();
+  }, [selectedMonth, selectedYear, profile]);
+
+  useEffect(() => {
+    const fetchDailyMeals = async () => {
+      if (!profile || members.length === 0) return;
+      
       const { data: dailyMealsData } = await supabase
         .from("meals")
         .select("*")
         .eq("date", selectedDate);
 
       const initialCounts: { [profileId: string]: number } = {};
-      activeMembers.forEach((member: any) => {
+      members.forEach((member: any) => {
         const found = dailyMealsData?.find((m: any) => m.profile_id === member.id);
         initialCounts[member.id] = found ? Number(found.count) : 0;
       });
       setDailyCounts(initialCounts);
-
-      setLoading(false);
     };
 
-    fetchData();
-  }, [selectedMonth, selectedYear, selectedDate]);
+    fetchDailyMeals();
+  }, [selectedDate, members, profile]);
 
   // Update counts in daily logger
   const handleCountChange = (profileId: string, value: number) => {
@@ -205,13 +224,29 @@ export default function MealsPage() {
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-400 mb-1.5 font-medium font-sans">Select Date</label>
-                    <input
-                      type="date"
-                      value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value)}
-                      className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-sans"
-                    />
+                    <label className="flex items-center gap-2 text-xs font-semibold text-zinc-400 mb-1.5 font-medium font-sans">
+                      Select Date
+                      <span className="group relative cursor-pointer flex items-center justify-center w-4 h-4 rounded-full bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors text-[10px]">
+                        i
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block bg-zinc-800 text-white text-[10px] py-1 px-2 rounded whitespace-nowrap shadow-xl border border-zinc-700 z-50">
+                          Format: DD/MM/YYYY
+                        </span>
+                      </span>
+                    </label>
+                    <div className="w-full">
+                      <DatePicker
+                        selected={selectedDate ? new Date(selectedDate) : new Date()}
+                        onChange={(date: Date | null) => {
+                          if (date) {
+                            const offsetDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+                            setSelectedDate(offsetDate.toISOString().split("T")[0]);
+                          }
+                        }}
+                        dateFormat="dd/MM/yyyy"
+                        className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-sans"
+                        wrapperClassName="w-full"
+                      />
+                    </div>
                   </div>
 
                   <div className="border-t border-zinc-800/80 pt-4 space-y-3.5">
@@ -250,13 +285,27 @@ export default function MealsPage() {
                     </p>
                   )}
 
-                  <button
-                    onClick={handleSaveDailyMeals}
-                    disabled={saving}
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg text-sm shadow-md transition-colors disabled:opacity-50 font-sans"
-                  >
-                    {saving ? "Saving..." : `Save Meals for ${selectedDate}`}
-                  </button>
+                  <div className="pt-2">
+                    <div className="bg-zinc-950/60 p-3 rounded-lg border border-zinc-800/80 mb-3">
+                      <p className="text-xs text-zinc-500 font-sans mb-1 font-semibold uppercase">Summary to log:</p>
+                      <p className="text-sm text-zinc-300 font-sans">
+                        {membersToLog.filter((m) => (dailyCounts[m.id] || 0) > 0).length > 0 
+                          ? membersToLog
+                              .filter((m) => (dailyCounts[m.id] || 0) > 0)
+                              .map((m) => `${m.full_name?.split(' ')[0]}: ${dailyCounts[m.id]}`)
+                              .join(", ")
+                          : <span className="text-zinc-500 italic">No meals selected</span>}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleSaveDailyMeals}
+                      disabled={saving}
+                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg text-sm shadow-md transition-colors disabled:opacity-50 font-sans cursor-pointer"
+                    >
+                      {saving ? "Saving..." : `Save Meals for ${formatDate(selectedDate)}`}
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (
