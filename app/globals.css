@@ -59,6 +59,7 @@ html.light-mode .bg-zinc-900\/60 {
 html.light-mode .bg-zinc-950\/40,
 html.light-mode .bg-zinc-950\/20,
 html.light-mode .bg-zinc-950\/30,
+html.light-mode .bg-zinc-950\/60,
 html.light-mode .bg-zinc-950\/80 {
   background-color: #f1f5f9 !important;
 }
@@ -135,6 +136,7 @@ html.light-mode .bg-zinc-900\/20 {
 
 /* Table header / section header strips */
 html.light-mode .bg-zinc-950\/50,
+html.light-mode .bg-zinc-950\/60,
 html.light-mode .bg-zinc-950\/80 {
   background-color: #f1f5f9 !important; /* slate-100 — calm, not too dark */
   color: #1e293b !important;

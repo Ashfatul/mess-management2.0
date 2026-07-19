@@ -256,7 +256,7 @@ export default function MealsPage() {
                         <div className="flex items-center gap-1.5 shrink-0">
                           <button
                             onClick={() => handleCountChange(member.id, Math.max(0, (dailyCounts[member.id] || 0) - 0.5))}
-                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 flex items-center justify-center text-zinc-300 hover:text-white transition-colors text-lg font-bold font-sans"
+                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-800/50 flex items-center justify-center text-zinc-300 hover:text-white transition-colors text-lg font-bold font-sans"
                           >
                             -
                           </button>
@@ -270,7 +270,7 @@ export default function MealsPage() {
                           />
                           <button
                             onClick={() => handleCountChange(member.id, (dailyCounts[member.id] || 0) + 0.5)}
-                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-950/60 flex items-center justify-center text-zinc-300 hover:text-white transition-colors text-lg font-bold font-sans"
+                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-800/50 flex items-center justify-center text-zinc-300 hover:text-white transition-colors text-lg font-bold font-sans"
                           >
                             +
                           </button>
@@ -286,7 +286,7 @@ export default function MealsPage() {
                   )}
 
                   <div className="pt-2">
-                    <div className="bg-zinc-950/60 p-3 rounded-lg border border-zinc-800/80 mb-3">
+                    <div className="bg-zinc-900/40 p-3 rounded-lg border border-zinc-800/80 mb-3">
                       <p className="text-xs text-zinc-500 font-sans mb-1 font-semibold uppercase">Summary to log:</p>
                       <p className="text-sm text-zinc-300 font-sans">
                         {membersToLog.filter((m) => (dailyCounts[m.id] || 0) > 0).length > 0 
