@@ -14,6 +14,7 @@ export default function MembersPage() {
   const [inviteRole, setInviteRole] = useState("member");
   const [submitting, setSubmitting] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [baseUrl, setBaseUrl] = useState("");
 
@@ -125,6 +126,43 @@ export default function MembersPage() {
     }
   };
 
+  // Permanently remove a member. This cascades to their meals, deposits,
+  // settlements and monthly-availability rows (per schema ON DELETE CASCADE),
+  // so past month calculations that included them will change.
+  const handleDeleteMember = async (member: any) => {
+    if (!profile || profile.role !== "super_admin") {
+      alert("Only Super Admins can remove members.");
+      return;
+    }
+    if (member.id === profile.id) {
+      alert("You cannot remove yourself.");
+      return;
+    }
+
+    const name = member.full_name || member.email || "this member";
+    const confirmed = confirm(
+      `Permanently remove ${name}?\n\n` +
+        `This deletes their entire meal history, deposits and settlement records. ` +
+        `Past month calculations that included them will change. This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(member.id);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", member.id);
+      if (error) throw error;
+      await fetchMembersAndInvites(profile.mess_id);
+    } catch (err: any) {
+      console.error(err);
+      alert("Error removing member: " + err.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex flex-col justify-center items-center bg-zinc-950 text-zinc-50 py-24 gap-4">
@@ -217,6 +255,7 @@ export default function MembersPage() {
                       <th className="px-4 sm:px-6 py-3.5">Name</th>
                       <th className="px-4 sm:px-6 py-3.5">Email</th>
                       <th className="px-4 sm:px-6 py-3.5">Role</th>
+                      {isSuperAdmin && <th className="px-4 sm:px-6 py-3.5 text-right">Action</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800/40">
@@ -233,6 +272,22 @@ export default function MembersPage() {
                             {m.role === "super_admin" ? "Super Admin" : "Member"}
                           </span>
                         </td>
+                        {isSuperAdmin && (
+                          <td className="px-4 sm:px-6 py-4 text-right">
+                            {m.id === profile?.id ? (
+                              <span className="text-xs text-zinc-600 italic">You</span>
+                            ) : (
+                              <button
+                                onClick={() => handleDeleteMember(m)}
+                                disabled={deletingId === m.id}
+                                className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1.5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Delete Member"
+                              >
+                                {deletingId === m.id ? "..." : "🗑️"}
+                              </button>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
