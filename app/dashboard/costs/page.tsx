@@ -2,12 +2,14 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
+import { fetchMonthlyStatus, activeMembersFor, MemberMonthStatusRow } from "@/lib/membership";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
 export default function CostsPage() {
   const [profile, setProfile] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
+  const [monthlyStatus, setMonthlyStatus] = useState<MemberMonthStatusRow[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   
@@ -103,6 +105,8 @@ export default function CostsPage() {
       
       const activeMembers = membersData || [];
       setMembers(activeMembers);
+
+      setMonthlyStatus(await fetchMonthlyStatus(profileData.mess_id));
 
       // Default all members checked for cost sharing
       const initialChecked: { [id: string]: boolean } = {};
@@ -256,7 +260,11 @@ export default function CostsPage() {
 
     if (isSharedSpender) {
       if (!sharedAll) {
-        const activeCheckedIds = Object.keys(selectedSharedMembers).filter((id) => selectedSharedMembers[id]);
+        // Only members active for the cost's month can be part of the split.
+        const formActiveIds = new Set(formActiveMembers.map((m: any) => m.id));
+        const activeCheckedIds = Object.keys(selectedSharedMembers).filter(
+          (id) => selectedSharedMembers[id] && formActiveIds.has(id)
+        );
         if (activeCheckedIds.length === 0) {
           setStatusMsg("Please select at least one member to share the cost.");
           return;
@@ -364,6 +372,10 @@ export default function CostsPage() {
     );
   }
 
+  // Only members active in the cost's month can be its spender or share it.
+  const [costYear, costMonth] = date.split("-").map((n) => parseInt(n, 10));
+  const formActiveMembers = activeMembersFor(members, monthlyStatus, costYear, costMonth);
+
   return (
     <div className="flex-1 bg-zinc-950 text-zinc-50 font-sans text-sm md:text-base flex flex-col h-full overflow-hidden">
       {/* Sticky Upper Action Bar */}
@@ -397,7 +409,7 @@ export default function CostsPage() {
                   className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm pr-10 appearance-none cursor-pointer font-sans"
                 >
                   <option value="shared">Shared (Paid from Mess Box / Shared Fund)</option>
-                  {members.map((m) => (
+                  {formActiveMembers.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.full_name || m.email}
                     </option>
@@ -478,7 +490,7 @@ export default function CostsPage() {
                       </div>
 
                       <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
-                        {members.map((m) => {
+                        {formActiveMembers.map((m) => {
                           const isChecked = selectedSharedMembers[m.id] || false;
                           return (
                             <div key={m.id} className="flex items-center justify-between gap-2">

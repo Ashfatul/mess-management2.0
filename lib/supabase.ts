@@ -14,6 +14,7 @@ interface MockDB {
   deposits: any[];
   costs: any[];
   settlements: any[];
+  member_month_status: any[];
   currentUser: any | null;
 }
 
@@ -60,6 +61,7 @@ const INITIAL_MOCK_DATA: MockDB = {
     { id: "c6", profile_id: "user-ashfatul", date: "2026-05-07", cost_category: "wifi", items: "Wifi Bill", amount: 680.0 },
   ],
   settlements: [],
+  member_month_status: [],
   currentUser: {
     id: "user-ashfatul",
     email: "ashfatul@example.com",
@@ -74,7 +76,14 @@ const getLocalDB = (): MockDB => {
     localStorage.setItem("mess_mock_db", JSON.stringify(INITIAL_MOCK_DATA));
     return INITIAL_MOCK_DATA;
   }
-  return JSON.parse(data);
+  const parsed = JSON.parse(data);
+  // Backfill any tables missing from an older persisted DB so inserts don't get lost
+  (Object.keys(INITIAL_MOCK_DATA) as (keyof MockDB)[]).forEach((key) => {
+    if (key !== "currentUser" && !(key in parsed)) {
+      (parsed as any)[key] = [];
+    }
+  });
+  return parsed;
 };
 
 const saveLocalDB = (db: MockDB) => {

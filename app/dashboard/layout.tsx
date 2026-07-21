@@ -135,6 +135,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       : []),
     { name: "Month Settlements", href: "/dashboard/settlements", icon: "💼" },
     { name: "Members", href: "/dashboard/members", icon: "👥" },
+    { name: "Availability", href: "/dashboard/availability", icon: "📅" },
     { name: "Settings", href: "/dashboard/settings", icon: "⚙️" },
   ];
 

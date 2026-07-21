@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { fetchMonthlyStatus, activeMembersFor, MemberMonthStatusRow } from "@/lib/membership";
 
 export default function SettlementsPage() {
   const [profile, setProfile] = useState<any>(null);
@@ -15,6 +16,7 @@ export default function SettlementsPage() {
   const [allPastCosts, setAllPastCosts] = useState<any[]>([]);
   const [allPastDeposits, setAllPastDeposits] = useState<any[]>([]);
   const [allSettlements, setAllSettlements] = useState<any[]>([]);
+  const [monthlyStatus, setMonthlyStatus] = useState<MemberMonthStatusRow[]>([]);
 
   // Selected past month state
   const [pastMonthsList, setPastMonthsList] = useState<any[]>([]);
@@ -134,6 +136,8 @@ export default function SettlementsPage() {
         .eq("mess_id", profileData.mess_id);
       setMembers(membersData || []);
 
+      setMonthlyStatus(await fetchMonthlyStatus(profileData.mess_id));
+
       await fetchSettlementData(profileData.mess_id, messData?.created_at);
       setLoading(false);
     };
@@ -187,13 +191,16 @@ export default function SettlementsPage() {
   }
 
   const isPayAsYouGo = mess?.deposit_mode === "pay_as_you_go";
-  const memberCount = members.length || 1;
 
   // Process data for each month to find settled/unsettled status
   const monthsWithCalculatedStatus = pastMonthsList.map((mItem) => {
     const startDate = `${mItem.year}-${String(mItem.month).padStart(2, "0")}-01`;
     const lastDay = new Date(mItem.year, mItem.month, 0).getDate();
     const endDate = `${mItem.year}-${String(mItem.month).padStart(2, "0")}-${lastDay}`;
+
+    // Only members active for THIS month participate in cost sharing.
+    const monthMembers = activeMembersFor(members, monthlyStatus, mItem.year, mItem.month);
+    const memberCount = monthMembers.length || 1;
 
     const monthMeals = allPastMeals.filter((m) => m.date >= startDate && m.date <= endDate);
     const monthCosts = allPastCosts.filter((c) => c.date >= startDate && c.date <= endDate);
@@ -214,7 +221,7 @@ export default function SettlementsPage() {
       .filter((c) => c.cost_category !== "meal_bazar" && c.cost_category !== "global_bazar")
       .reduce((sum, c) => sum + Number(c.amount || 0), 0);
 
-    const rows = members.map((member) => {
+    const rows = monthMembers.map((member) => {
       const mMeals = monthMeals
         .filter((meal) => meal.profile_id === member.id)
         .reduce((sum, meal) => sum + Number(meal.count || 0), 0);

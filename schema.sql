@@ -4,10 +4,12 @@ DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
 DROP FUNCTION IF EXISTS get_my_mess_id() CASCADE;
 DROP FUNCTION IF EXISTS is_super_admin() CASCADE;
 
+DROP TABLE IF EXISTS member_month_status CASCADE;
 DROP TABLE IF EXISTS costs CASCADE;
 DROP TABLE IF EXISTS deposits CASCADE;
 DROP TABLE IF EXISTS meals CASCADE;
 DROP TABLE IF EXISTS invites CASCADE;
+DROP TABLE IF EXISTS settlements CASCADE;
 DROP TABLE IF EXISTS profiles CASCADE;
 DROP TABLE IF EXISTS messes CASCADE;
 
@@ -124,6 +126,23 @@ CREATE TABLE settlements (
 -- Enable RLS on settlements
 ALTER TABLE settlements ENABLE ROW LEVEL SECURITY;
 
+-- Create table for per-month member availability.
+-- A row means the member is DISABLED (not participating) for that (year, month).
+-- Absence of a row = member is active for that month (default: everyone participates).
+CREATE TABLE member_month_status (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    mess_id UUID REFERENCES messes(id) ON DELETE CASCADE NOT NULL,
+    profile_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+    year INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    added_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    UNIQUE (mess_id, profile_id, year, month)
+);
+
+-- Enable RLS on member_month_status
+ALTER TABLE member_month_status ENABLE ROW LEVEL SECURITY;
+
 ----------------------------------------------------
 -- Row Level Security (RLS) Policies (Recursive-Safe Version)
 ----------------------------------------------------
@@ -237,6 +256,19 @@ CREATE POLICY "Allow read settlements for mess" ON settlements
 
 CREATE POLICY "Allow super admin manage settlements" ON settlements
     FOR ALL TO authenticated USING (
+        mess_id = get_my_mess_id() AND is_super_admin()
+    );
+
+-- Member Month Status Policies
+CREATE POLICY "Allow read member month status for mess" ON member_month_status
+    FOR SELECT TO authenticated USING (
+        mess_id = get_my_mess_id()
+    );
+
+CREATE POLICY "Allow super admin manage member month status" ON member_month_status
+    FOR ALL TO authenticated USING (
+        mess_id = get_my_mess_id() AND is_super_admin()
+    ) WITH CHECK (
         mess_id = get_my_mess_id() AND is_super_admin()
     );
 

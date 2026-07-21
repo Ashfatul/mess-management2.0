@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { fetchMonthlyStatus, activeMembersFor, MemberMonthStatusRow } from "@/lib/membership";
 
 export default function DashboardPage() {
   const [profile, setProfile] = useState<any>(null);
   const [mess, setMess] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
+  const [monthlyStatus, setMonthlyStatus] = useState<MemberMonthStatusRow[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1); // 1-12
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [meals, setMeals] = useState<any[]>([]);
@@ -64,6 +66,8 @@ export default function DashboardPage() {
       const activeMembers = membersData || [];
       setMembers(activeMembers);
 
+      setMonthlyStatus(await fetchMonthlyStatus(profileData.mess_id));
+
       const startDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`;
       const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
       const endDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${lastDay}`;
@@ -105,7 +109,9 @@ export default function DashboardPage() {
   }
 
   // --- Calculations ---
-  const memberCount = members.length || 1;
+  // Only members active for the selected month participate in cost sharing.
+  const activeMembers = activeMembersFor(members, monthlyStatus, selectedYear, selectedMonth);
+  const memberCount = activeMembers.length || 1;
   const isPayAsYouGo = mess?.deposit_mode === "pay_as_you_go";
 
   // Meal Rate Calculations
@@ -129,8 +135,8 @@ export default function DashboardPage() {
   const totalDeposits = isPayAsYouGo ? totalMealCost + totalOtherCost : loggedDepositsSum;
   const currentBalance = isPayAsYouGo ? 0.0 : totalDeposits - totalMealCost - totalOtherCost;
 
-  // Map individual details for the members table
-  const summaryRows = members.map((m) => {
+  // Map individual details for the members table (active members only)
+  const summaryRows = activeMembers.map((m) => {
     const mMeals = meals
       .filter((meal) => meal.profile_id === m.id)
       .reduce((sum, meal) => sum + Number(meal.count || 0), 0);
@@ -211,7 +217,7 @@ export default function DashboardPage() {
   let displayBalance = currentBalance;
   let isBalancePositive = currentBalance >= 0;
 
-  const currentViewMember = members.find((m) => m.id === viewContext);
+  const currentViewMember = activeMembers.find((m) => m.id === viewContext);
 
   if (viewContext !== "overall" && currentViewMember) {
     const memberSummary = summaryRows.find((row) => row.profile.id === viewContext);
@@ -230,9 +236,9 @@ export default function DashboardPage() {
   }
 
   const isSuperAdmin = profile?.role === "super_admin";
-  const selectOptions = isSuperAdmin 
-    ? members 
-    : members.filter((m) => m.id === profile?.id);
+  const selectOptions = isSuperAdmin
+    ? activeMembers
+    : activeMembers.filter((m) => m.id === profile?.id);
 
   // --- Calendar Math ---
   const firstDayIndex = new Date(selectedYear, selectedMonth - 1, 1).getDay(); // Starting weekday (0 = Sun, 1 = Mon...)

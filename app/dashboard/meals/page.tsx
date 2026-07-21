@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { fetchMonthlyStatus, activeMembersFor, MemberMonthStatusRow } from "@/lib/membership";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -9,6 +10,7 @@ export default function MealsPage() {
   const [profile, setProfile] = useState<any>(null);
   const [mess, setMess] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
+  const [monthlyStatus, setMonthlyStatus] = useState<MemberMonthStatusRow[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
@@ -77,6 +79,8 @@ export default function MealsPage() {
       
       const activeMembers = membersData || [];
       setMembers(activeMembers);
+
+      setMonthlyStatus(await fetchMonthlyStatus(profileData.mess_id));
 
       setLoading(false);
     };
@@ -184,14 +188,21 @@ export default function MealsPage() {
     );
   }
 
-  const isAllowedToLog = !mess || 
-    mess.meal_entry_rule !== "admin_only" || 
+  const isAllowedToLog = !mess ||
+    mess.meal_entry_rule !== "admin_only" ||
     profile?.role === "super_admin";
+
+  // Members active for the day being logged (derive month/year from selectedDate).
+  const [logYear, logMonth] = selectedDate.split("-").map((n) => parseInt(n, 10));
+  const activeForLoggedDay = activeMembersFor(members, monthlyStatus, logYear, logMonth);
+
+  // Members active for the month shown in the register grid.
+  const activeForGrid = activeMembersFor(members, monthlyStatus, selectedYear, selectedMonth);
 
   // Filter members displayed in logger form depending on the active rule
   const membersToLog = (mess?.meal_entry_rule === "member_self_only" && profile?.role !== "super_admin")
-    ? members.filter((m: any) => m.id === profile?.id)
-    : members;
+    ? activeForLoggedDay.filter((m: any) => m.id === profile?.id)
+    : activeForLoggedDay;
 
   const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
   const dayRows = Array.from({ length: daysInMonth }, (_, i) => i + 1);
@@ -361,7 +372,7 @@ export default function MealsPage() {
                 <thead className="bg-zinc-950/80 text-xs text-zinc-400 border-b border-zinc-800 uppercase tracking-wider sticky top-0 z-10">
                   <tr>
                     <th className="px-3 sm:px-4 py-3 bg-zinc-950">Day</th>
-                    {members.map((m) => (
+                    {activeForGrid.map((m) => (
                       <th key={m.id} className="px-3 sm:px-4 py-3 min-w-[80px] sm:min-w-[90px]">
                         {m.full_name || "Unnamed"}
                       </th>
@@ -376,7 +387,7 @@ export default function MealsPage() {
                     return (
                       <tr key={day} className="hover:bg-zinc-900/10 transition-colors">
                         <td className="px-3 sm:px-4 py-2.5 font-bold text-zinc-400 bg-zinc-950/30">{day}</td>
-                        {members.map((m) => {
+                        {activeForGrid.map((m) => {
                           const cellMeal = monthlyMeals.find((meal) => meal.profile_id === m.id && meal.date === dateStr);
                           const countVal = cellMeal ? Number(cellMeal.count) : 0;
                           dailySum += countVal;
@@ -400,7 +411,7 @@ export default function MealsPage() {
                 <tfoot className="bg-zinc-950/80 font-bold border-t border-zinc-800 uppercase text-xs tracking-wider sticky bottom-0 z-10">
                   <tr>
                     <td className="px-3 sm:px-4 py-3">Total</td>
-                    {members.map((m) => {
+                    {activeForGrid.map((m) => {
                       const memberTotal = monthlyMeals
                         .filter((meal) => meal.profile_id === m.id)
                         .reduce((sum, meal) => sum + Number(meal.count || 0), 0);

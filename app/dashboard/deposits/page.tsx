@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { fetchMonthlyStatus, activeMembersFor, MemberMonthStatusRow } from "@/lib/membership";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
 export default function DepositsPage() {
   const [profile, setProfile] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
+  const [monthlyStatus, setMonthlyStatus] = useState<MemberMonthStatusRow[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   
@@ -88,6 +90,8 @@ export default function DepositsPage() {
       
       setMembers(membersData || []);
 
+      setMonthlyStatus(await fetchMonthlyStatus(profileData.mess_id));
+
       await fetchDeposits(profileData.mess_id);
       setLoading(false);
     };
@@ -154,6 +158,10 @@ export default function DepositsPage() {
     );
   }
 
+  // Only members active in the deposit's month can be its depositor.
+  const [depYear, depMonth] = date.split("-").map((n) => parseInt(n, 10));
+  const formActiveMembers = activeMembersFor(members, monthlyStatus, depYear, depMonth);
+
   return (
     <div className="flex-1 bg-zinc-950 text-zinc-50 font-sans text-sm md:text-base flex flex-col h-full overflow-hidden">
       {/* Sticky Upper Action Bar */}
@@ -182,7 +190,7 @@ export default function DepositsPage() {
                   onChange={(e) => setDepositorId(e.target.value)}
                   className="w-full bg-zinc-950/80 border border-zinc-800 px-3.5 py-2.5 rounded-lg text-zinc-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm pr-10 appearance-none cursor-pointer font-sans"
                 >
-                  {members.map((m) => (
+                  {formActiveMembers.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.full_name || m.email}
                     </option>

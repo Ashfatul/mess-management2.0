@@ -311,11 +311,12 @@ export default function SettingsPage() {
           }
         }
 
-        // 2. Remove invites and other members
+        // 2. Remove invites, monthly availability rows, and other members
         const { error: errorInvites } = await supabase.from("invites").delete().eq("mess_id", profile.mess_id);
+        const { error: errorStatus } = await supabase.from("member_month_status").delete().eq("mess_id", profile.mess_id);
         const { error: errorProfiles } = await supabase.from("profiles").delete().eq("mess_id", profile.mess_id).neq("id", profile.id);
-        
-        if (errorInvites || errorProfiles) {
+
+        if (errorInvites || errorStatus || errorProfiles) {
           throw new Error("Failed to remove invites or other members.");
         }
       }
